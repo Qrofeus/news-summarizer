@@ -3,8 +3,8 @@ import traceback
 
 from config import Config
 from scrapers.bbc import BBCScraper
-from scrapers.npr import NPRScraper
 from scrapers.guardian import GuardianScraper
+from scrapers.worldnews import WorldNewsScraper
 from summarizers.base import Summarizer
 from summarizers.gemini import GeminiSummarizer
 from summarizers.fallback import FallbackSummarizer
@@ -22,7 +22,7 @@ def run_daily_digest() -> None:
     setup_logging()
     config = Config.from_env()
 
-    scrapers = [BBCScraper(config), NPRScraper(config), GuardianScraper(config)]
+    scrapers = [BBCScraper(config), GuardianScraper(config), WorldNewsScraper(config)]
     all_articles = []
     scraper_errors = []
 

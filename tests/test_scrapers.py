@@ -5,14 +5,15 @@ from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock
 from config import Config
 from scrapers.bbc import BBCScraper
-from scrapers.npr import NPRScraper
 from scrapers.guardian import GuardianScraper
+from scrapers.worldnews import WorldNewsScraper
 
 
 def make_config(request_delay=0.0):
     return Config(
         gemini_api_key='test-key',
         guardian_api_key='test-guardian-key',
+        worldnews_api_key='test-worldnews-key',
         mysql_host='localhost',
         mysql_user='user',
         mysql_password='pass',
@@ -138,97 +139,132 @@ def test_robots_disallowed_raises(mock_robots):
         BBCScraper(make_config()).fetch_articles(hours=24)
 
 
-# ── NPR ──────────────────────────────────────────────────────────────────────
+# ── World News ───────────────────────────────────────────────────────────────
+
+def make_worldnews_response(items):
+    """Each item: {'title', 'url', 'hours_ago', 'category'(opt), 'text'(opt)}."""
+    now = datetime.now(timezone.utc)
+    results = []
+    for item in items:
+        pub_dt = now - timedelta(hours=item['hours_ago'])
+        results.append({
+            'title': item['title'],
+            'url': item['url'],
+            'publish_date': pub_dt.strftime('%Y-%m-%d %H:%M:%S'),
+            'text': item.get('text', 'Article body text.'),
+            'category': item.get('category', 'politics'),
+        })
+    return json.dumps({'news': results})
+
 
 @responses_lib.activate
-@patch('scrapers.npr.NPRScraper._get_robots')
-@patch('scrapers.npr.NPRScraper._fetch_content', return_value='Full article text.')
-def test_npr_fetch_returns_recent_articles(mock_content, mock_robots):
+@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
+def test_worldnews_fetch_returns_recent_articles(mock_robots):
     mock_robots.return_value.can_fetch.return_value = True
-    rss = make_rss_xml([
-        {'title': 'Recent', 'url': 'https://www.npr.org/2026/05/11/recent', 'hours_ago': 1},
-        {'title': 'Old', 'url': 'https://www.npr.org/2026/05/09/old', 'hours_ago': 48},
+    body = make_worldnews_response([
+        {'title': 'Recent', 'url': 'https://example.com/recent', 'hours_ago': 1},
+        {'title': 'Old', 'url': 'https://example.com/old', 'hours_ago': 48},
     ])
-    responses_lib.add(responses_lib.GET, NPRScraper.RSS_URL, body=rss, status=200)
+    responses_lib.add(responses_lib.GET, WorldNewsScraper.API_URL, body=body,
+                      content_type='application/json', status=200)
 
-    articles = NPRScraper(make_config()).fetch_articles(hours=24)
+    articles = WorldNewsScraper(make_config()).fetch_articles(hours=24)
 
     assert len(articles) == 1
     assert articles[0].title == 'Recent'
-    assert articles[0].source == 'NPR'
+    assert articles[0].source == 'World News'
 
 
 @responses_lib.activate
-@patch('scrapers.npr.NPRScraper._get_robots')
-@patch('scrapers.npr.NPRScraper._fetch_content', return_value='Text.')
-def test_npr_fetch_filters_all_old_articles(mock_content, mock_robots):
+@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
+def test_worldnews_fetch_filters_all_old_articles(mock_robots):
     mock_robots.return_value.can_fetch.return_value = True
-    rss = make_rss_xml([
-        {'title': 'Old A', 'url': 'https://www.npr.org/2026/05/09/a', 'hours_ago': 25},
-        {'title': 'Old B', 'url': 'https://www.npr.org/2026/05/09/b', 'hours_ago': 50},
+    body = make_worldnews_response([
+        {'title': 'Old A', 'url': 'https://example.com/a', 'hours_ago': 25},
+        {'title': 'Old B', 'url': 'https://example.com/b', 'hours_ago': 50},
     ])
-    responses_lib.add(responses_lib.GET, NPRScraper.RSS_URL, body=rss, status=200)
+    responses_lib.add(responses_lib.GET, WorldNewsScraper.API_URL, body=body,
+                      content_type='application/json', status=200)
 
-    articles = NPRScraper(make_config()).fetch_articles(hours=24)
+    articles = WorldNewsScraper(make_config()).fetch_articles(hours=24)
 
     assert articles == []
 
 
-def test_npr_source_name():
-    assert NPRScraper(make_config()).get_source_name() == 'NPR'
-
-
-@patch('scrapers.npr.NewspaperArticle')
-def test_npr_fetch_content_returns_text(mock_article_cls):
-    mock_article = MagicMock()
-    mock_article.text = 'Full article content here.'
-    mock_article_cls.return_value = mock_article
-
-    result = NPRScraper(make_config())._fetch_content('https://www.npr.org/2026/05/11/test')
-
-    mock_article_cls.assert_called_once_with('https://www.npr.org/2026/05/11/test', request_timeout=10,
-                                              headers={'User-Agent': 'TestAgent/1.0'})
-    mock_article.download.assert_called_once()
-    mock_article.parse.assert_called_once()
-    assert result == 'Full article content here.'
+def test_worldnews_source_name():
+    assert WorldNewsScraper(make_config()).get_source_name() == 'World News'
 
 
 @responses_lib.activate
-@patch('scrapers.npr.NPRScraper._get_robots')
-def test_npr_rss_fetch_failure_raises(mock_robots):
+@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
+def test_worldnews_no_text_skips_article(mock_robots):
     mock_robots.return_value.can_fetch.return_value = True
-    responses_lib.add(
-        responses_lib.GET, NPRScraper.RSS_URL, body=Exception('Connection refused')
-    )
+    now = datetime.now(timezone.utc)
+    results = [
+        {
+            'title': 'No Text',
+            'url': 'https://example.com/no-text',
+            'publish_date': now.strftime('%Y-%m-%d %H:%M:%S'),
+            'text': '',
+            'category': 'politics',
+        },
+        {
+            'title': 'Has Text',
+            'url': 'https://example.com/has-text',
+            'publish_date': now.strftime('%Y-%m-%d %H:%M:%S'),
+            'text': 'Some content here.',
+            'category': 'politics',
+        },
+    ]
+    body = json.dumps({'news': results})
+    responses_lib.add(responses_lib.GET, WorldNewsScraper.API_URL, body=body,
+                      content_type='application/json', status=200)
 
-    with pytest.raises(Exception):
-        NPRScraper(make_config()).fetch_articles(hours=24)
-
-
-@responses_lib.activate
-@patch('scrapers.npr.NPRScraper._get_robots')
-@patch('scrapers.npr.NPRScraper._fetch_content')
-def test_npr_article_download_failure_skips(mock_content, mock_robots):
-    mock_robots.return_value.can_fetch.return_value = True
-    mock_content.side_effect = [Exception('Download failed'), 'Good content.']
-    rss = make_rss_xml([
-        {'title': 'Fail', 'url': 'https://www.npr.org/2026/05/11/fail', 'hours_ago': 1},
-        {'title': 'OK', 'url': 'https://www.npr.org/2026/05/11/ok', 'hours_ago': 2},
-    ])
-    responses_lib.add(responses_lib.GET, NPRScraper.RSS_URL, body=rss, status=200)
-
-    articles = NPRScraper(make_config()).fetch_articles(hours=24)
+    articles = WorldNewsScraper(make_config()).fetch_articles(hours=24)
 
     assert len(articles) == 1
-    assert articles[0].title == 'OK'
+    assert articles[0].title == 'Has Text'
 
 
-@patch('scrapers.npr.NPRScraper._get_robots')
-def test_npr_robots_disallowed_raises(mock_robots):
+@responses_lib.activate
+@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
+def test_worldnews_api_failure_raises(mock_robots):
+    mock_robots.return_value.can_fetch.return_value = True
+    responses_lib.add(responses_lib.GET, WorldNewsScraper.API_URL,
+                      body=Exception('Connection refused'))
+
+    with pytest.raises(Exception):
+        WorldNewsScraper(make_config()).fetch_articles(hours=24)
+
+
+@responses_lib.activate
+@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
+def test_worldnews_article_skip_on_bad_data(mock_robots):
+    mock_robots.return_value.can_fetch.return_value = True
+    now = datetime.now(timezone.utc)
+    results = [
+        {'title': 'Bad date', 'url': 'https://example.com/x',
+         'publish_date': 'not-a-date', 'text': 'Text.', 'category': 'news'},
+        {'title': 'Good', 'url': 'https://example.com/good',
+         'publish_date': now.strftime('%Y-%m-%d %H:%M:%S'),
+         'text': 'Good content.', 'category': 'news'},
+    ]
+    body = json.dumps({'news': results})
+    responses_lib.add(responses_lib.GET, WorldNewsScraper.API_URL, body=body,
+                      content_type='application/json', status=200)
+
+    articles = WorldNewsScraper(make_config()).fetch_articles(hours=24)
+
+    assert len(articles) == 1
+    assert articles[0].title == 'Good'
+
+
+@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
+def test_worldnews_robots_disallowed_raises(mock_robots):
     mock_robots.return_value.can_fetch.return_value = False
 
     with pytest.raises(PermissionError):
-        NPRScraper(make_config()).fetch_articles(hours=24)
+        WorldNewsScraper(make_config()).fetch_articles(hours=24)
 
 
 # ── Guardian ──────────────────────────────────────────────────────────────────

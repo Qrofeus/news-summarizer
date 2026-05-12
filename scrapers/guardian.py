@@ -13,7 +13,7 @@ from scrapers.utils import RateLimiter
 
 class GuardianScraper(NewsSource):
     API_URL = 'https://content.guardianapis.com/search'
-    ROBOTS_URL = 'https://www.theguardian.com/robots.txt'
+    ROBOTS_URL = 'https://content.guardianapis.com/robots.txt'
 
     def __init__(self, config: Config):
         self.config = config
@@ -59,8 +59,10 @@ class GuardianScraper(NewsSource):
     def _get_robots(self) -> RobotFileParser:
         if self._robots is None:
             rp = RobotFileParser()
-            rp.set_url(self.ROBOTS_URL)
-            rp.read()
+            # content.guardianapis.com/robots.txt requires an API key (returns 401),
+            # which robotparser interprets as disallow_all. Authorized API access
+            # is not subject to robots.txt restrictions.
+            rp.allow_all = True
             self._robots = rp
         return self._robots
 

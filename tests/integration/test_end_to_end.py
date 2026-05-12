@@ -36,6 +36,7 @@ def _make_config(**overrides) -> Config:
     base = dict(
         gemini_api_key='test-gemini-key',
         guardian_api_key='test-guardian-key',
+        worldnews_api_key='test-worldnews-key',
         mysql_host='localhost',
         mysql_user='user',
         mysql_password='pass',
@@ -73,18 +74,18 @@ def _make_summary(articles: list[Article], used_fallback=False) -> DigestSummary
 
 @patch('main.Config.from_env')
 @patch('main.GeminiSummarizer')
+@patch('main.WorldNewsScraper')
 @patch('main.GuardianScraper')
-@patch('main.NPRScraper')
 @patch('main.BBCScraper')
-def test_full_pipeline_dry_run(mock_bbc, mock_npr, mock_guardian, mock_gemini, mock_config):
+def test_full_pipeline_dry_run(mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config):
     articles = _load_articles()
     mock_config.return_value = _make_config(dry_run=True)
     mock_bbc.return_value.fetch_articles.return_value = articles[:2]
     mock_bbc.return_value.get_source_name.return_value = 'BBC'
-    mock_npr.return_value.fetch_articles.return_value = articles[2:4]
-    mock_npr.return_value.get_source_name.return_value = 'NPR'
-    mock_guardian.return_value.fetch_articles.return_value = articles[4:]
+    mock_guardian.return_value.fetch_articles.return_value = articles[2:4]
     mock_guardian.return_value.get_source_name.return_value = 'The Guardian'
+    mock_worldnews.return_value.fetch_articles.return_value = articles[4:]
+    mock_worldnews.return_value.get_source_name.return_value = 'World News'
     mock_gemini.return_value.summarize.return_value = _make_summary(articles)
 
     run_daily_digest()
@@ -99,15 +100,15 @@ def test_full_pipeline_dry_run(mock_bbc, mock_npr, mock_guardian, mock_gemini, m
 @patch('main.Config.from_env')
 @patch('main.FallbackSummarizer')
 @patch('main.GeminiSummarizer')
+@patch('main.WorldNewsScraper')
 @patch('main.GuardianScraper')
-@patch('main.NPRScraper')
 @patch('main.BBCScraper')
 def test_pipeline_uses_fallback_when_gemini_fails(
-    mock_bbc, mock_npr, mock_guardian, mock_gemini, mock_fallback, mock_config
+    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_fallback, mock_config
 ):
     articles = _load_articles()
     mock_config.return_value = _make_config(dry_run=True, enable_fallback=True)
-    for mock, src in [(mock_bbc, 'BBC'), (mock_npr, 'NPR'), (mock_guardian, 'The Guardian')]:
+    for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
         mock.return_value.fetch_articles.return_value = articles[:2]
         mock.return_value.get_source_name.return_value = src
     mock_gemini.return_value.summarize.side_effect = RuntimeError('quota exceeded')
@@ -122,20 +123,20 @@ def test_pipeline_uses_fallback_when_gemini_fails(
 
 @patch('main.Config.from_env')
 @patch('main.GeminiSummarizer')
+@patch('main.WorldNewsScraper')
 @patch('main.GuardianScraper')
-@patch('main.NPRScraper')
 @patch('main.BBCScraper')
 def test_pipeline_continues_when_one_scraper_fails(
-    mock_bbc, mock_npr, mock_guardian, mock_gemini, mock_config
+    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config
 ):
     articles = _load_articles()
     mock_config.return_value = _make_config(dry_run=True)
     mock_bbc.return_value.fetch_articles.side_effect = ConnectionError('timeout')
     mock_bbc.return_value.get_source_name.return_value = 'BBC'
-    mock_npr.return_value.fetch_articles.return_value = articles[:3]
-    mock_npr.return_value.get_source_name.return_value = 'NPR'
-    mock_guardian.return_value.fetch_articles.return_value = articles[3:]
+    mock_guardian.return_value.fetch_articles.return_value = articles[:3]
     mock_guardian.return_value.get_source_name.return_value = 'The Guardian'
+    mock_worldnews.return_value.fetch_articles.return_value = articles[3:]
+    mock_worldnews.return_value.get_source_name.return_value = 'World News'
     mock_gemini.return_value.summarize.return_value = _make_summary(articles[:6])
 
     # Should not raise despite BBC failing
@@ -147,12 +148,12 @@ def test_pipeline_continues_when_one_scraper_fails(
 # ── Insufficient data guard ───────────────────────────────────────────────────
 
 @patch('main.Config.from_env')
+@patch('main.WorldNewsScraper')
 @patch('main.GuardianScraper')
-@patch('main.NPRScraper')
 @patch('main.BBCScraper')
-def test_pipeline_raises_on_too_few_articles(mock_bbc, mock_npr, mock_guardian, mock_config):
+def test_pipeline_raises_on_too_few_articles(mock_bbc, mock_guardian, mock_worldnews, mock_config):
     mock_config.return_value = _make_config(dry_run=True)
-    for mock, src in [(mock_bbc, 'BBC'), (mock_npr, 'NPR'), (mock_guardian, 'The Guardian')]:
+    for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
         mock.return_value.fetch_articles.return_value = []
         mock.return_value.get_source_name.return_value = src
 
@@ -165,15 +166,15 @@ def test_pipeline_raises_on_too_few_articles(mock_bbc, mock_npr, mock_guardian, 
 @patch('main.send_digest')
 @patch('main.Config.from_env')
 @patch('main.GeminiSummarizer')
+@patch('main.WorldNewsScraper')
 @patch('main.GuardianScraper')
-@patch('main.NPRScraper')
 @patch('main.BBCScraper')
 def test_dry_run_does_not_call_send_digest(
-    mock_bbc, mock_npr, mock_guardian, mock_gemini, mock_config, mock_send
+    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config, mock_send
 ):
     articles = _load_articles()
     mock_config.return_value = _make_config(dry_run=True)
-    for mock, src in [(mock_bbc, 'BBC'), (mock_npr, 'NPR'), (mock_guardian, 'The Guardian')]:
+    for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
         mock.return_value.fetch_articles.return_value = articles[:2]
         mock.return_value.get_source_name.return_value = src
     mock_gemini.return_value.summarize.return_value = _make_summary(articles)
@@ -187,15 +188,15 @@ def test_dry_run_does_not_call_send_digest(
 
 @patch('main.Config.from_env')
 @patch('main.GeminiSummarizer')
+@patch('main.WorldNewsScraper')
 @patch('main.GuardianScraper')
-@patch('main.NPRScraper')
 @patch('main.BBCScraper')
 def test_pipeline_raises_when_llm_fails_and_fallback_disabled(
-    mock_bbc, mock_npr, mock_guardian, mock_gemini, mock_config
+    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config
 ):
     articles = _load_articles()
     mock_config.return_value = _make_config(dry_run=True, enable_fallback=False)
-    for mock, src in [(mock_bbc, 'BBC'), (mock_npr, 'NPR'), (mock_guardian, 'The Guardian')]:
+    for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
         mock.return_value.fetch_articles.return_value = articles[:2]
         mock.return_value.get_source_name.return_value = src
     mock_gemini.return_value.summarize.side_effect = RuntimeError('API down')

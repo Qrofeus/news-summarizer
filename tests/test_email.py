@@ -13,6 +13,7 @@ def make_config():
     return Config(
         gemini_api_key='k',
         guardian_api_key='k',
+        worldnews_api_key='k',
         mysql_host='localhost',
         mysql_user='u',
         mysql_password='p',

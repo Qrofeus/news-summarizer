@@ -9,6 +9,7 @@ load_dotenv()
 class Config:
     gemini_api_key: str
     guardian_api_key: str
+    worldnews_api_key: str
     mysql_host: str
     mysql_user: str
     mysql_password: str
@@ -27,6 +28,7 @@ class Config:
         return cls(
             gemini_api_key=os.getenv('GEMINI_API_KEY'),
             guardian_api_key=os.getenv('GUARDIAN_API_KEY', 'test'),
+            worldnews_api_key=os.getenv('WORLDNEWS_API_KEY', 'test'),
             mysql_host=os.getenv('MYSQL_HOST'),
             mysql_user=os.getenv('MYSQL_USER'),
             mysql_password=os.getenv('MYSQL_PASSWORD'),
