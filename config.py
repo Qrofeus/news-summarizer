@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+from typing import List
+
 from dotenv import load_dotenv
 import os
 
@@ -10,12 +12,12 @@ class Config:
     gemini_api_key: str
     guardian_api_key: str
     worldnews_api_key: str
-    mysql_host: str
-    mysql_user: str
-    mysql_password: str
-    mysql_database: str
-    php_handler_url: str
-    php_handler_token: str
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password: str
+    smtp_from: str
+    recipients: List[str]
     admin_email: str
     user_agent: str
     request_delay: float
@@ -25,16 +27,19 @@ class Config:
 
     @classmethod
     def from_env(cls):
+        recipients_raw = os.getenv('RECIPIENTS', '')
+        recipients = [r.strip() for r in recipients_raw.split(',') if r.strip()]
+        smtp_user = os.getenv('SMTP_USER')
         return cls(
             gemini_api_key=os.getenv('GEMINI_API_KEY'),
             guardian_api_key=os.getenv('GUARDIAN_API_KEY', 'test'),
             worldnews_api_key=os.getenv('WORLDNEWS_API_KEY', 'test'),
-            mysql_host=os.getenv('MYSQL_HOST'),
-            mysql_user=os.getenv('MYSQL_USER'),
-            mysql_password=os.getenv('MYSQL_PASSWORD'),
-            mysql_database=os.getenv('MYSQL_DATABASE'),
-            php_handler_url=os.getenv('PHP_HANDLER_URL'),
-            php_handler_token=os.getenv('PHP_HANDLER_TOKEN'),
+            smtp_host=os.getenv('SMTP_HOST'),
+            smtp_port=int(os.getenv('SMTP_PORT', '587')),
+            smtp_user=smtp_user,
+            smtp_password=os.getenv('SMTP_PASSWORD'),
+            smtp_from=os.getenv('SMTP_FROM') or smtp_user,
+            recipients=recipients,
             admin_email=os.getenv('ADMIN_EMAIL'),
             user_agent=os.getenv('USER_AGENT', 'NewsDigest/1.0'),
             request_delay=float(os.getenv('REQUEST_DELAY', 2.5)),

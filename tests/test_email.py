@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
+from unittest.mock import patch, MagicMock
 
-import responses as responses_lib
 import pytest
 
 from config import Config
@@ -14,12 +14,12 @@ def make_config():
         gemini_api_key='k',
         guardian_api_key='k',
         worldnews_api_key='k',
-        mysql_host='localhost',
-        mysql_user='u',
-        mysql_password='p',
-        mysql_database='db',
-        php_handler_url='https://qrofeus.dev/email-handler.php',
-        php_handler_token='secret-token',
+        smtp_host='smtp.example.com',
+        smtp_port=587,
+        smtp_user='user@example.com',
+        smtp_password='pass',
+        smtp_from='user@example.com',
+        recipients=['recipient@example.com'],
         admin_email='admin@qrofeus.dev',
         user_agent='TestAgent/1.0',
         request_delay=0.0,
@@ -37,7 +37,7 @@ def make_summary(categories=None, used_fallback=False):
                     'summary': 'Leaders met to discuss trade policy.',
                     'articles': [
                         {'title': 'Summit Held', 'url': 'https://bbc.com/summit', 'source': 'BBC'},
-                        {'title': 'Deal Reached', 'url': 'https://npr.org/deal', 'source': 'NPR'},
+                        {'title': 'Deal Reached', 'url': 'https://guardian.com/deal', 'source': 'The Guardian'},
                     ],
                 }
             ],
@@ -102,14 +102,14 @@ def test_generate_contains_summary_text():
 def test_generate_contains_article_links():
     result = generate_email_html(make_summary())
     assert 'href="https://bbc.com/summit"' in result
-    assert 'href="https://npr.org/deal"' in result
+    assert 'href="https://guardian.com/deal"' in result
     assert 'href="https://guardian.com/chip"' in result
 
 
 def test_generate_contains_source_labels():
     result = generate_email_html(make_summary())
     assert 'BBC: Summit Held' in result
-    assert 'NPR: Deal Reached' in result
+    assert 'The Guardian: Deal Reached' in result
 
 
 def test_generate_no_errors_no_error_section():
@@ -177,52 +177,49 @@ def test_generate_slugifies_multiword_category():
 
 # ── send_digest ───────────────────────────────────────────────────────────────
 
-HANDLER_URL = 'https://qrofeus.dev/email-handler.php'
+@patch('mailer.sender.smtplib.SMTP')
+def test_send_delivers_to_each_recipient(mock_smtp_cls):
+    mock_smtp = MagicMock()
+    mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_smtp)
+    mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
+    result = send_digest('<html>content</html>', make_config())
+    assert mock_smtp.sendmail.call_count == 1
+    assert result['sent'] == 1
+    assert result['success'] is True
 
 
-@responses_lib.activate
-def test_send_posts_to_handler_url():
-    responses_lib.add(responses_lib.POST, HANDLER_URL,
-                      json={'success': True, 'sent': 1, 'failed': 0}, status=200)
-    send_digest('<html>content</html>', make_config())
-    assert responses_lib.calls[0].request.url == HANDLER_URL
+@patch('mailer.sender.smtplib.SMTP')
+def test_send_uses_starttls(mock_smtp_cls):
+    mock_smtp = MagicMock()
+    mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_smtp)
+    mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
+    send_digest('<html></html>', make_config())
+    mock_smtp.starttls.assert_called_once()
 
 
-@responses_lib.activate
-def test_send_includes_token_header():
-    responses_lib.add(responses_lib.POST, HANDLER_URL,
-                      json={'success': True, 'sent': 1, 'failed': 0}, status=200)
-    send_digest('<html>content</html>', make_config())
-    assert responses_lib.calls[0].request.headers['X-Digest-Token'] == 'secret-token'
+@patch('mailer.sender.smtplib.SMTP')
+def test_send_logs_in_with_credentials(mock_smtp_cls):
+    mock_smtp = MagicMock()
+    mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_smtp)
+    mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
+    config = make_config()
+    send_digest('<html></html>', config)
+    mock_smtp.login.assert_called_once_with(config.smtp_user, config.smtp_password)
 
 
-@responses_lib.activate
-def test_send_posts_html_content():
-    responses_lib.add(responses_lib.POST, HANDLER_URL,
-                      json={'success': True, 'sent': 1, 'failed': 0}, status=200)
-    send_digest('<html>my digest</html>', make_config())
-    assert 'html_content=' in responses_lib.calls[0].request.body
-
-
-@responses_lib.activate
-def test_send_returns_parsed_json():
-    responses_lib.add(responses_lib.POST, HANDLER_URL,
-                      json={'success': True, 'sent': 2, 'failed': 0}, status=200)
+@patch('mailer.sender.smtplib.SMTP')
+def test_send_returns_result_dict(mock_smtp_cls):
+    mock_smtp = MagicMock()
+    mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_smtp)
+    mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
     result = send_digest('<html></html>', make_config())
-    assert result == {'success': True, 'sent': 2, 'failed': 0}
+    assert 'success' in result
+    assert 'sent' in result
+    assert 'failed' in result
 
 
-@responses_lib.activate
-def test_send_raises_on_http_error():
-    responses_lib.add(responses_lib.POST, HANDLER_URL,
-                      json={'error': 'Unauthorized'}, status=403)
-    with pytest.raises(Exception):
-        send_digest('<html></html>', make_config())
-
-
-@responses_lib.activate
-def test_send_raises_on_connection_error():
-    responses_lib.add(responses_lib.POST, HANDLER_URL,
-                      body=ConnectionError('Network unreachable'))
+@patch('mailer.sender.smtplib.SMTP')
+def test_send_raises_on_connection_error(mock_smtp_cls):
+    mock_smtp_cls.side_effect = ConnectionError('Network unreachable')
     with pytest.raises(Exception):
         send_digest('<html></html>', make_config())

@@ -29,10 +29,10 @@ def _render_toc(categories: dict) -> str:
 def _render_sources(articles: list) -> str:
     links = []
     for a in articles:
-        url = html.escape(a['url'])
-        title = html.escape(a['title'])
-        source = html.escape(a['source'])
-        links.append(f'<a href="{url}">{source}: {title}</a>')
+        url = html.escape(a.get('url') or '#')
+        title = html.escape(a.get('title') or 'Article')
+        source = html.escape(a.get('source') or '')
+        links.append(f'<a href="{url}">{source}: {title}</a>' if source else f'<a href="{url}">{title}</a>')
     return ' &nbsp;|&nbsp; '.join(links)
 
 

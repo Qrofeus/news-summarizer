@@ -13,39 +13,59 @@ from mailer.sender import send_digest
 from utils.logging_config import setup_logging
 from utils.error_notifier import send_error_email
 
+_SKIP_CATEGORIES = {
+    'sport', 'sports', 'culture', 'lifestyle', 'film', 'music', 'books',
+    'stage', 'food', 'travel', 'fashion', 'entertainment', 'celebrity',
+    'tv and radio', 'tv-and-radio', 'games', 'crosswords', 'environment',
+    'lifeandstyle', 'artanddesign', 'commentisfree',
+}
+_MAX_ARTICLES = 60
+
 
 class InsufficientDataError(Exception):
     pass
+
+
+def _prepare_articles(all_articles):
+    filtered = [
+        a for a in all_articles
+        if not a.category or a.category.lower() not in _SKIP_CATEGORIES
+    ]
+    logging.info(f'Category filter: {len(all_articles)} -> {len(filtered)} articles')
+    return sorted(filtered, key=lambda a: a.published_at, reverse=True)[:_MAX_ARTICLES]
 
 
 def run_daily_digest() -> None:
     setup_logging()
     config = Config.from_env()
 
-    scrapers = [BBCScraper(config), GuardianScraper(config), WorldNewsScraper(config)]
+    run_errors = []
     all_articles = []
-    scraper_errors = []
 
+    scrapers = [BBCScraper(config), GuardianScraper(config), WorldNewsScraper(config)]
     for scraper in scrapers:
         try:
             articles = scraper.fetch_articles(hours=24)
             all_articles.extend(articles)
+            logging.info(f"{scraper.get_source_name()}: {len(articles)} articles fetched")
         except Exception as e:
-            scraper_errors.append(f"{scraper.get_source_name()}: {str(e)}")
+            run_errors.append(f"{scraper.get_source_name()}: {str(e)}")
             logging.warning(f"Scraper {scraper.get_source_name()} failed: {e}")
 
     if len(all_articles) < 5:
         raise InsufficientDataError(f"Only {len(all_articles)} articles scraped")
 
+    articles = _prepare_articles(all_articles)
+
     summarizer: Summarizer = GeminiSummarizer(api_key=config.gemini_api_key)
     try:
-        summary = summarizer.summarize(all_articles)
+        summary = summarizer.summarize(articles)
     except Exception as e:
         logging.error(f"LLM failed: {e}")
         if config.enable_fallback:
             summarizer = FallbackSummarizer()
-            summary = summarizer.summarize(all_articles)
-            scraper_errors.append("LLM summarization failed, using fallback")
+            summary = summarizer.summarize(articles)
+            run_errors.append("LLM summarization failed, using fallback")
         else:
             raise
 
@@ -53,7 +73,7 @@ def run_daily_digest() -> None:
         logging.info("DRY_RUN=true — skipping email send")
         return
 
-    email_html = generate_email_html(summary, scraper_errors)
+    email_html = generate_email_html(summary, run_errors)
     result = send_digest(email_html, config)
     logging.info(f"Digest sent: {result}")
 

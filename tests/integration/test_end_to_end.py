@@ -1,6 +1,6 @@
 """
 Integration tests for the full daily digest pipeline.
-All external I/O (scrapers, Gemini, PHP handler) is mocked.
+All external I/O (scrapers, Gemini, SMTP) is mocked.
 """
 import json
 from datetime import datetime, timezone
@@ -37,12 +37,12 @@ def _make_config(**overrides) -> Config:
         gemini_api_key='test-gemini-key',
         guardian_api_key='test-guardian-key',
         worldnews_api_key='test-worldnews-key',
-        mysql_host='localhost',
-        mysql_user='user',
-        mysql_password='pass',
-        mysql_database='db',
-        php_handler_url='https://qrofeus.dev/email-handler.php',
-        php_handler_token='token',
+        smtp_host='smtp.example.com',
+        smtp_port=587,
+        smtp_user='user@example.com',
+        smtp_password='pass',
+        smtp_from='user@example.com',
+        recipients=['recipient@example.com'],
         admin_email='admin@qrofeus.dev',
         user_agent='TestAgent/1.0',
         request_delay=0.0,

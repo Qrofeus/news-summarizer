@@ -26,12 +26,11 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GUARDIAN_API_KEY: ${{ secrets.GUARDIAN_API_KEY }}
           WORLDNEWS_API_KEY: ${{ secrets.WORLDNEWS_API_KEY }}
-          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
-          MYSQL_USER: ${{ secrets.MYSQL_USER }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
-          PHP_HANDLER_URL: ${{ secrets.PHP_HANDLER_URL }}
-          PHP_HANDLER_TOKEN: ${{ secrets.PHP_HANDLER_TOKEN }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          RECIPIENTS: ${{ secrets.RECIPIENTS }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           USER_AGENT: 'DailyNewsDigest/1.0 (+https://qrofeus.dev)'
           REQUEST_DELAY: '2.5'
