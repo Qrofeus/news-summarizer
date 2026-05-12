@@ -1,0 +1,40 @@
+name: Daily News Digest
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run digest pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GUARDIAN_API_KEY: ${{ secrets.GUARDIAN_API_KEY }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          PHP_HANDLER_URL: ${{ secrets.PHP_HANDLER_URL }}
+          PHP_HANDLER_TOKEN: ${{ secrets.PHP_HANDLER_TOKEN }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          USER_AGENT: 'DailyNewsDigest/1.0 (+https://qrofeus.dev)'
+          REQUEST_DELAY: '2.5'
+          ENABLE_LLM: 'true'
+          ENABLE_FALLBACK: 'true'
+          DRY_RUN: 'false'
+        run: python main.py

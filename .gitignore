@@ -1,0 +1,12 @@
+CLAUDE.md
+.claude/
+.env
+*.pyc
+__pycache__/
+.idea/
+.venv/
+venv/
+.pytest_cache/
+logs/*.log
+db_config.php
+\[private\]*

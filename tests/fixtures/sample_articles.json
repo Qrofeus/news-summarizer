@@ -1,0 +1,8 @@
+[
+  {"title": "Senate passes new climate bill", "content": "The Senate voted 54-46 to pass sweeping climate legislation after weeks of debate.", "url": "https://www.bbc.com/news/world-us-canada-1", "source": "BBC", "hours_ago": 2},
+  {"title": "Fed holds interest rates steady", "content": "The Federal Reserve kept its benchmark rate unchanged, citing stable inflation and strong employment.", "url": "https://www.npr.org/2026/05/11/fed-rates", "source": "NPR", "hours_ago": 3},
+  {"title": "OpenAI launches new model", "content": "OpenAI announced its latest AI model with improved reasoning capabilities and lower cost.", "url": "https://www.theguardian.com/technology/openai-model", "source": "The Guardian", "hours_ago": 5},
+  {"title": "Ceasefire talks resume in Middle East", "content": "International mediators resumed ceasefire negotiations after a brief pause in the conflict.", "url": "https://www.bbc.com/news/world-middle-east-2", "source": "BBC", "hours_ago": 6},
+  {"title": "WHO warns of new virus variant", "content": "The World Health Organization issued guidance on a newly identified virus variant spreading across Southeast Asia.", "url": "https://www.npr.org/2026/05/11/who-variant", "source": "NPR", "hours_ago": 8},
+  {"title": "Tech giants face new antitrust probe", "content": "Regulators announced an investigation into the market practices of several major technology companies.", "url": "https://www.theguardian.com/technology/antitrust", "source": "The Guardian", "hours_ago": 10}
+]
