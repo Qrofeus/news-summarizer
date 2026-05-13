@@ -19,10 +19,10 @@ pip install -r requirements.txt
 cp .env.example .env          # fill in your keys
 ```
 
-Run a dry run (no email sent):
+Preview the digest locally (no email sent, output saved to `output/digest_preview.html`):
 
 ```bash
-DRY_RUN=true python main.py
+python dry_run_preview.py
 ```
 
 ### Environment variables
@@ -39,7 +39,6 @@ DRY_RUN=true python main.py
 | `SMTP_FROM` | From address (defaults to `SMTP_USER`) |
 | `RECIPIENTS` | Comma-separated list of recipient email addresses |
 | `ADMIN_EMAIL` | Error notification recipient |
-| `DRY_RUN` | `true` to skip email send (local testing) |
 | `ENABLE_LLM` | `true` to use Gemini (default), `false` to force fallback |
 | `REQUEST_DELAY` | Seconds between scraper requests (default `2.5`) |
 

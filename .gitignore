@@ -10,3 +10,4 @@ venv/
 logs/*.log
 db_config.php
 \[private\]*
+output/
