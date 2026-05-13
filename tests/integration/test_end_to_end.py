@@ -48,7 +48,6 @@ def _make_config(**overrides) -> Config:
         request_delay=0.0,
         enable_llm=True,
         enable_fallback=True,
-        dry_run=True,
     )
     base.update(overrides)
     return Config(**base)
@@ -72,14 +71,15 @@ def _make_summary(articles: list[Article], used_fallback=False) -> DigestSummary
 
 # ── Happy path ────────────────────────────────────────────────────────────────
 
+@patch('main.send_digest')
 @patch('main.Config.from_env')
 @patch('main.GeminiSummarizer')
 @patch('main.WorldNewsScraper')
 @patch('main.GuardianScraper')
 @patch('main.BBCScraper')
-def test_full_pipeline_dry_run(mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config):
+def test_full_pipeline_runs(mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config, mock_send):
     articles = _load_articles()
-    mock_config.return_value = _make_config(dry_run=True)
+    mock_config.return_value = _make_config()
     mock_bbc.return_value.fetch_articles.return_value = articles[:2]
     mock_bbc.return_value.get_source_name.return_value = 'BBC'
     mock_guardian.return_value.fetch_articles.return_value = articles[2:4]
@@ -97,6 +97,7 @@ def test_full_pipeline_dry_run(mock_bbc, mock_guardian, mock_worldnews, mock_gem
 
 # ── Fallback summarizer path ──────────────────────────────────────────────────
 
+@patch('main.send_digest')
 @patch('main.Config.from_env')
 @patch('main.FallbackSummarizer')
 @patch('main.GeminiSummarizer')
@@ -104,10 +105,10 @@ def test_full_pipeline_dry_run(mock_bbc, mock_guardian, mock_worldnews, mock_gem
 @patch('main.GuardianScraper')
 @patch('main.BBCScraper')
 def test_pipeline_uses_fallback_when_gemini_fails(
-    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_fallback, mock_config
+    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_fallback, mock_config, mock_send
 ):
     articles = _load_articles()
-    mock_config.return_value = _make_config(dry_run=True, enable_fallback=True)
+    mock_config.return_value = _make_config(enable_fallback=True)
     for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
         mock.return_value.fetch_articles.return_value = articles[:2]
         mock.return_value.get_source_name.return_value = src
@@ -121,16 +122,17 @@ def test_pipeline_uses_fallback_when_gemini_fails(
 
 # ── Scraper isolation ─────────────────────────────────────────────────────────
 
+@patch('main.send_digest')
 @patch('main.Config.from_env')
 @patch('main.GeminiSummarizer')
 @patch('main.WorldNewsScraper')
 @patch('main.GuardianScraper')
 @patch('main.BBCScraper')
 def test_pipeline_continues_when_one_scraper_fails(
-    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config
+    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config, mock_send
 ):
     articles = _load_articles()
-    mock_config.return_value = _make_config(dry_run=True)
+    mock_config.return_value = _make_config()
     mock_bbc.return_value.fetch_articles.side_effect = ConnectionError('timeout')
     mock_bbc.return_value.get_source_name.return_value = 'BBC'
     mock_guardian.return_value.fetch_articles.return_value = articles[:3]
@@ -152,7 +154,7 @@ def test_pipeline_continues_when_one_scraper_fails(
 @patch('main.GuardianScraper')
 @patch('main.BBCScraper')
 def test_pipeline_raises_on_too_few_articles(mock_bbc, mock_guardian, mock_worldnews, mock_config):
-    mock_config.return_value = _make_config(dry_run=True)
+    mock_config.return_value = _make_config()
     for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
         mock.return_value.fetch_articles.return_value = []
         mock.return_value.get_source_name.return_value = src
@@ -161,7 +163,7 @@ def test_pipeline_raises_on_too_few_articles(mock_bbc, mock_guardian, mock_world
         run_daily_digest()
 
 
-# ── Dry run skips send ────────────────────────────────────────────────────────
+# ── send_digest is called on success ─────────────────────────────────────────
 
 @patch('main.send_digest')
 @patch('main.Config.from_env')
@@ -169,11 +171,11 @@ def test_pipeline_raises_on_too_few_articles(mock_bbc, mock_guardian, mock_world
 @patch('main.WorldNewsScraper')
 @patch('main.GuardianScraper')
 @patch('main.BBCScraper')
-def test_dry_run_does_not_call_send_digest(
+def test_send_digest_called_on_success(
     mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config, mock_send
 ):
     articles = _load_articles()
-    mock_config.return_value = _make_config(dry_run=True)
+    mock_config.return_value = _make_config()
     for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
         mock.return_value.fetch_articles.return_value = articles[:2]
         mock.return_value.get_source_name.return_value = src
@@ -181,7 +183,7 @@ def test_dry_run_does_not_call_send_digest(
 
     run_daily_digest()
 
-    mock_send.assert_not_called()
+    mock_send.assert_called_once()
 
 
 # ── LLM errors without fallback propagate ────────────────────────────────────
@@ -195,7 +197,7 @@ def test_pipeline_raises_when_llm_fails_and_fallback_disabled(
     mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config
 ):
     articles = _load_articles()
-    mock_config.return_value = _make_config(dry_run=True, enable_fallback=False)
+    mock_config.return_value = _make_config(enable_fallback=False)
     for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
         mock.return_value.fetch_articles.return_value = articles[:2]
         mock.return_value.get_source_name.return_value = src

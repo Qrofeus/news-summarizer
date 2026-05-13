@@ -69,10 +69,6 @@ def run_daily_digest() -> None:
         else:
             raise
 
-    if config.dry_run:
-        logging.info("DRY_RUN=true — skipping email send")
-        return
-
     email_html = generate_email_html(summary, run_errors)
     result = send_digest(email_html, config)
     logging.info(f"Digest sent: {result}")

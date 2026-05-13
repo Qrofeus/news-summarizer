@@ -25,7 +25,6 @@ def make_config(request_delay=0.0):
         request_delay=request_delay,
         enable_llm=True,
         enable_fallback=True,
-        dry_run=True,
     )
 
 

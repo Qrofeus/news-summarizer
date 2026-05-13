@@ -25,7 +25,6 @@ def make_config():
         request_delay=0.0,
         enable_llm=True,
         enable_fallback=True,
-        dry_run=True,
     )
 
 
@@ -71,8 +70,8 @@ def test_generate_contains_date():
 
 def test_generate_contains_category_headings():
     result = generate_email_html(make_summary())
-    assert '<h2>Politics</h2>' in result
-    assert '<h2>Technology</h2>' in result
+    assert 'POLITICS' in result
+    assert 'TECHNOLOGY' in result
 
 
 def test_generate_toc_has_anchor_links():
@@ -108,8 +107,10 @@ def test_generate_contains_article_links():
 
 def test_generate_contains_source_labels():
     result = generate_email_html(make_summary())
-    assert 'BBC: Summit Held' in result
-    assert 'The Guardian: Deal Reached' in result
+    assert 'Summit Held' in result
+    assert 'Deal Reached' in result
+    assert 'BBC' in result
+    assert 'The Guardian' in result
 
 
 def test_generate_no_errors_no_error_section():

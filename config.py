@@ -23,7 +23,6 @@ class Config:
     request_delay: float
     enable_llm: bool
     enable_fallback: bool
-    dry_run: bool
 
     @classmethod
     def from_env(cls):
@@ -45,5 +44,4 @@ class Config:
             request_delay=float(os.getenv('REQUEST_DELAY', 2.5)),
             enable_llm=os.getenv('ENABLE_LLM', 'true').lower() == 'true',
             enable_fallback=os.getenv('ENABLE_FALLBACK', 'true').lower() == 'true',
-            dry_run=os.getenv('DRY_RUN', 'false').lower() == 'true',
         )
