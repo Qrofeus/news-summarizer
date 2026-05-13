@@ -4,13 +4,7 @@ Automated ETL pipeline that scrapes news from BBC, The Guardian, and World News 
 
 ## Architecture
 
-```
-GitHub Actions (6 AM UTC)
-    └── main.py
-            ├── scrapers/          BBC, Guardian, World News API → Article list
-            ├── summarizers/       Gemini 2.5 Flash Lite → DigestSummary (fallback: keyword grouping)
-            └── mailer/            HTML generator + direct SMTP delivery
-```
+![Architecture](docs/architecture.jpg)
 
 ## Setup
 
