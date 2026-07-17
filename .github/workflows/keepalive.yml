@@ -1,0 +1,25 @@
+name: Keep Repository Active
+
+on:
+  schedule:
+    - cron: '0 0 1 * *'
+  workflow_dispatch:
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Append Timestamp to KEEPALIVE.md
+        run: |
+          echo "Last Ping: $(date -u '[%Y-%m-%d %H:%M:%S UTC]')" >> KEEPALIVE.md
+
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          git add KEEPALIVE.md
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: keepalive ping" && git push)
