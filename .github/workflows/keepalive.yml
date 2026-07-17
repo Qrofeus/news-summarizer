@@ -15,7 +15,8 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Append Timestamp
-        run: echo "Last Ping: $(date -u +'[%Y-%m-%d %H:%M:%S UTC]')" >> KEEPALIVE.md
+        run: |
+          echo "Last Ping: $(date -u +'[%Y-%m-%d %H:%M:%S UTC]')" >> KEEPALIVE.md
 
       - name: Commit and Push
         run: |
