@@ -28,29 +28,33 @@ def make_config():
     )
 
 
-def make_summary(categories=None, used_fallback=False):
-    if categories is None:
-        categories = {
-            'Politics': [
-                {
-                    'summary': 'Leaders met to discuss trade policy.',
-                    'articles': [
-                        {'title': 'Summit Held', 'url': 'https://bbc.com/summit', 'source': 'BBC'},
-                        {'title': 'Deal Reached', 'url': 'https://guardian.com/deal', 'source': 'The Guardian'},
-                    ],
-                }
-            ],
-            'Technology': [
-                {
-                    'summary': 'A new chip was announced.',
-                    'articles': [
-                        {'title': 'Chip News', 'url': 'https://guardian.com/chip', 'source': 'The Guardian'},
-                    ],
-                }
-            ],
-        }
+def make_summary(stories=None, used_fallback=False):
+    if stories is None:
+        stories = [
+            {
+                'title': 'Leaders reach trade deal at summit',
+                'category': 'Politics',
+                'summary': 'Leaders met to discuss trade policy.',
+                'articles': [
+                    {'title': 'Summit Held', 'url': 'https://bbc.com/summit', 'source': 'BBC'},
+                    {'title': 'Deal Reached', 'url': 'https://guardian.com/deal', 'source': 'The Guardian'},
+                ],
+                'perspectives': [
+                    {'source': 'BBC', 'angle': 'Focused on economic terms.'},
+                    {'source': 'The Guardian', 'angle': 'Highlighted political risk.'},
+                ],
+            },
+            {
+                'title': 'New silicon chip announced',
+                'category': 'Technology',
+                'summary': 'A new chip was announced.',
+                'articles': [
+                    {'title': 'Chip News', 'url': 'https://guardian.com/chip', 'source': 'The Guardian'},
+                ],
+            },
+        ]
     return DigestSummary(
-        categories=categories,
+        stories=stories,
         generated_at=datetime(2026, 5, 11, 6, 0, 0, tzinfo=timezone.utc),
         article_count=3,
         used_fallback=used_fallback,
@@ -68,28 +72,22 @@ def test_generate_contains_date():
     assert 'May 11, 2026' in result
 
 
-def test_generate_contains_category_headings():
+def test_generate_contains_story_titles():
+    result = generate_email_html(make_summary())
+    assert 'Leaders reach trade deal at summit' in result
+    assert 'New silicon chip announced' in result
+
+
+def test_generate_contains_category_tags():
     result = generate_email_html(make_summary())
     assert 'POLITICS' in result
     assert 'TECHNOLOGY' in result
 
 
-def test_generate_toc_has_anchor_links():
+def test_generate_story_has_id():
     result = generate_email_html(make_summary())
-    assert 'href="#politics"' in result
-    assert 'href="#technology"' in result
-
-
-def test_generate_toc_shows_article_counts():
-    result = generate_email_html(make_summary())
-    assert '2 articles' in result
-    assert '1 article' in result
-
-
-def test_generate_category_section_has_id():
-    result = generate_email_html(make_summary())
-    assert 'id="politics"' in result
-    assert 'id="technology"' in result
+    assert 'id="story-0"' in result
+    assert 'id="story-1"' in result
 
 
 def test_generate_contains_summary_text():
@@ -105,12 +103,28 @@ def test_generate_contains_article_links():
     assert 'href="https://guardian.com/chip"' in result
 
 
-def test_generate_contains_source_labels():
+def test_generate_contains_source_cites():
     result = generate_email_html(make_summary())
-    assert 'Summit Held' in result
-    assert 'Deal Reached' in result
-    assert 'BBC' in result
-    assert 'The Guardian' in result
+    assert '[BBC]' in result
+    assert '[The Guardian]' in result
+
+
+def test_generate_renders_perspectives_when_present():
+    result = generate_email_html(make_summary())
+    assert 'Perspectives' in result
+    assert 'Focused on economic terms.' in result
+    assert 'Highlighted political risk.' in result
+
+
+def test_generate_omits_perspectives_when_absent():
+    stories = [{
+        'title': 'Solo story',
+        'category': 'Other',
+        'summary': 'Just one source.',
+        'articles': [{'title': 'A', 'url': 'https://x.com/1', 'source': 'BBC'}],
+    }]
+    result = generate_email_html(make_summary(stories=stories))
+    assert 'Perspectives' not in result
 
 
 def test_generate_no_errors_no_error_section():
@@ -125,31 +139,27 @@ def test_generate_renders_errors_section():
 
 
 def test_generate_escapes_html_in_summary():
-    categories = {
-        'Other': [
-            {
-                'summary': '<script>alert("xss")</script>',
-                'articles': [{'title': 'T', 'url': 'https://example.com', 'source': 'BBC'}],
-            }
-        ]
-    }
-    result = generate_email_html(make_summary(categories=categories))
+    stories = [{
+        'title': 'T',
+        'category': 'Other',
+        'summary': '<script>alert("xss")</script>',
+        'articles': [{'title': 'T', 'url': 'https://example.com', 'source': 'BBC'}],
+    }]
+    result = generate_email_html(make_summary(stories=stories))
     assert '<script>' not in result
     assert '&lt;script&gt;' in result
 
 
-def test_generate_escapes_html_in_article_title():
-    categories = {
-        'Other': [
-            {
-                'summary': 'Normal summary.',
-                'articles': [{'title': '<b>Bold</b>', 'url': 'https://example.com', 'source': 'BBC'}],
-            }
-        ]
-    }
-    result = generate_email_html(make_summary(categories=categories))
-    assert '<b>Bold</b>' not in result
-    assert '&lt;b&gt;' in result
+def test_generate_escapes_html_in_story_title():
+    stories = [{
+        'title': '<b>Bold Title</b>',
+        'category': 'Other',
+        'summary': 'Normal summary.',
+        'articles': [{'title': 'T', 'url': 'https://example.com', 'source': 'BBC'}],
+    }]
+    result = generate_email_html(make_summary(stories=stories))
+    assert '<b>Bold Title</b>' not in result
+    assert '&lt;b&gt;Bold Title&lt;/b&gt;' in result
 
 
 def test_generate_shows_fallback_note_when_used():
@@ -162,18 +172,10 @@ def test_generate_no_fallback_note_when_not_used():
     assert 'AI summarization unavailable' not in result
 
 
-def test_generate_slugifies_multiword_category():
-    categories = {
-        'World news': [
-            {
-                'summary': 'Global events.',
-                'articles': [{'title': 'War Update', 'url': 'https://bbc.com/war', 'source': 'BBC'}],
-            }
-        ]
-    }
-    result = generate_email_html(make_summary(categories=categories))
-    assert 'id="world-news"' in result
-    assert 'href="#world-news"' in result
+def test_generate_no_story_count_in_masthead():
+    result = generate_email_html(make_summary())
+    assert '2 stories' not in result
+    assert 'stories</p>' not in result
 
 
 # ── send_digest ───────────────────────────────────────────────────────────────

@@ -10,6 +10,7 @@ from summarizers.gemini import GeminiSummarizer
 from summarizers.fallback import FallbackSummarizer
 from mailer.generator import generate_email_html
 from mailer.sender import send_digest
+from scrapers.utils import dedupe_articles, sort_proportional
 from utils.logging_config import setup_logging
 from utils.error_notifier import send_error_email
 
@@ -19,7 +20,7 @@ _SKIP_CATEGORIES = {
     'tv and radio', 'tv-and-radio', 'games', 'crosswords', 'environment',
     'lifeandstyle', 'artanddesign', 'commentisfree',
 }
-_MAX_ARTICLES = 60
+_MAX_ARTICLES = 50
 
 
 class InsufficientDataError(Exception):
@@ -31,8 +32,10 @@ def _prepare_articles(all_articles):
         a for a in all_articles
         if not a.category or a.category.lower() not in _SKIP_CATEGORIES
     ]
-    logging.info(f'Category filter: {len(all_articles)} -> {len(filtered)} articles')
-    return sorted(filtered, key=lambda a: a.published_at, reverse=True)[:_MAX_ARTICLES]
+    deduped = dedupe_articles(filtered)
+    picked = sort_proportional(deduped, _MAX_ARTICLES)
+    logging.info(f'Filter+dedup+proportional: {len(all_articles)} -> {len(filtered)} -> {len(deduped)} -> {len(picked)}')
+    return picked
 
 
 def run_daily_digest() -> None:

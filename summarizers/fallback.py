@@ -1,5 +1,4 @@
 import re
-from collections import defaultdict
 from datetime import datetime, timezone
 from typing import List
 
@@ -34,6 +33,8 @@ _CATEGORY_KEYWORDS: dict[str, list[str]] = {
     ],
 }
 
+_MAX_STORIES = 10
+
 
 def _score_keywords(text: str, keywords: list[str]) -> int:
     total = 0
@@ -60,15 +61,18 @@ def _extract_summary(article: Article) -> str:
 
 class FallbackSummarizer(Summarizer):
     def summarize(self, articles: List[Article]) -> DigestSummary:
-        categories: dict = defaultdict(list)
-        for article in articles:
-            category = _assign_category(article)
-            categories[category].append({
-                'summary': _extract_summary(article),
-                'articles': [{'title': article.title, 'url': article.url, 'source': article.source}],
-            })
+        selected = articles[:_MAX_STORIES]
+        stories = [
+            {
+                'title': a.title,
+                'category': _assign_category(a),
+                'summary': _extract_summary(a),
+                'articles': [{'title': a.title, 'url': a.url, 'source': a.source}],
+            }
+            for a in selected
+        ]
         return DigestSummary(
-            categories=dict(categories),
+            stories=stories,
             generated_at=datetime.now(timezone.utc),
             article_count=len(articles),
             used_fallback=True,

@@ -55,14 +55,20 @@ def _make_config(**overrides) -> Config:
 
 def _make_summary(articles: list[Article], used_fallback=False) -> DigestSummary:
     return DigestSummary(
-        categories={
-            'Politics': [{'summary': 'Senators debated policy.', 'articles': [
-                {'title': articles[0].title, 'url': articles[0].url, 'source': articles[0].source}
-            ]}],
-            'Technology': [{'summary': 'AI advances continue.', 'articles': [
-                {'title': articles[2].title, 'url': articles[2].url, 'source': articles[2].source}
-            ]}],
-        },
+        stories=[
+            {
+                'title': 'Senators debate landmark policy',
+                'category': 'Politics',
+                'summary': 'Senators debated policy.',
+                'articles': [{'title': articles[0].title, 'url': articles[0].url, 'source': articles[0].source}],
+            },
+            {
+                'title': 'AI advances continue',
+                'category': 'Technology',
+                'summary': 'AI advances continue.',
+                'articles': [{'title': articles[2].title, 'url': articles[2].url, 'source': articles[2].source}],
+            },
+        ],
         generated_at=datetime.now(timezone.utc),
         article_count=len(articles),
         used_fallback=used_fallback,

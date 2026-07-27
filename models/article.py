@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 
 @dataclass
@@ -15,7 +15,13 @@ class Article:
 
 @dataclass
 class DigestSummary:
-    categories: dict  # {"Politics": [{"summary": "...", "articles": [...]}]}
+    """Curated daily brief. `stories` is a ranked list, most significant first.
+
+    Each story: {"title", "category", "summary", "articles", "perspectives"?}
+    - articles: [{"title", "url", "source"}]
+    - perspectives (optional, only for multi-source clusters): [{"source", "angle"}]
+    """
+    stories: List[dict]
     generated_at: datetime
     article_count: int
     used_fallback: bool = False
