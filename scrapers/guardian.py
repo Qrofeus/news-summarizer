@@ -1,35 +1,19 @@
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import List
-from urllib.robotparser import RobotFileParser
-
-import requests
 
 from config import Config
 from models.article import Article
 from scrapers.base import NewsSource
-from scrapers.utils import RateLimiter
 
 
 class GuardianScraper(NewsSource):
     API_URL = 'https://content.guardianapis.com/search'
-    ROBOTS_URL = 'https://content.guardianapis.com/robots.txt'
-
-    def __init__(self, config: Config):
-        self.config = config
-        self.rate_limiter = RateLimiter(delay=config.request_delay)
-        self.session = requests.Session()
-        self.session.headers['User-Agent'] = config.user_agent
-        self._robots: RobotFileParser | None = None
 
     def get_source_name(self) -> str:
         return 'The Guardian'
 
     def fetch_articles(self, hours: int = 24) -> List[Article]:
-        robots = self._get_robots()
-        if not robots.can_fetch(self.config.user_agent, self.API_URL):
-            raise PermissionError(f'robots.txt disallows fetching {self.API_URL}')
-
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         results = self._fetch_api(cutoff)
 
@@ -55,16 +39,6 @@ class GuardianScraper(NewsSource):
                 logging.warning(f'Guardian: skipping result with bad data: {e}')
 
         return articles
-
-    def _get_robots(self) -> RobotFileParser:
-        if self._robots is None:
-            rp = RobotFileParser()
-            # content.guardianapis.com/robots.txt requires an API key (returns 401),
-            # which robotparser interprets as disallow_all. Authorized API access
-            # is not subject to robots.txt restrictions.
-            rp.allow_all = True
-            self._robots = rp
-        return self._robots
 
     def _fetch_api(self, cutoff: datetime) -> List[dict]:
         params = {

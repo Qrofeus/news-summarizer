@@ -12,17 +12,12 @@ from summarizers.base import Summarizer
 from summarizers.prompts import GEMINI_PROMPT
 
 _MODEL = 'gemini-2.5-flash-lite'
-_INPUT_COST_PER_TOKEN = 0.10 / 1_000_000
-_OUTPUT_COST_PER_TOKEN = 0.40 / 1_000_000
-_ESTIMATED_INPUT_TOKENS_PER_ARTICLE = 100
-_ESTIMATED_OUTPUT_TOKENS = 500
 _MAX_RETRIES = 3
 _RETRY_DELAY = 10
 
 
 class GeminiSummarizer(Summarizer):
     def __init__(self, api_key: str):
-        self.api_key = api_key
         genai.configure(api_key=api_key)
         self._model = genai.GenerativeModel(_MODEL)
 
@@ -51,11 +46,6 @@ class GeminiSummarizer(Summarizer):
                     time.sleep(wait)
 
         raise last_error
-
-    def get_cost_estimate(self, articles: List[Article]) -> float:
-        input_tokens = len(articles) * _ESTIMATED_INPUT_TOKENS_PER_ARTICLE
-        return (input_tokens * _INPUT_COST_PER_TOKEN
-                + _ESTIMATED_OUTPUT_TOKENS * _OUTPUT_COST_PER_TOKEN)
 
     def _build_prompt(self, articles: List[Article]) -> str:
         date_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')

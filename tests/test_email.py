@@ -23,7 +23,6 @@ def make_config():
         admin_email='admin@qrofeus.dev',
         user_agent='TestAgent/1.0',
         request_delay=0.0,
-        enable_llm=True,
         enable_fallback=True,
     )
 
@@ -162,14 +161,26 @@ def test_generate_escapes_html_in_story_title():
     assert '&lt;b&gt;Bold Title&lt;/b&gt;' in result
 
 
-def test_generate_shows_fallback_note_when_used():
-    result = generate_email_html(make_summary(used_fallback=True))
+def test_generate_renders_fallback_warning_from_errors():
+    fallback_msg = 'AI summarization unavailable — Gemini failed (some reason). Showing raw extracted headlines instead of the curated brief.'
+    result = generate_email_html(make_summary(used_fallback=True), errors=[fallback_msg])
     assert 'AI summarization unavailable' in result
+    assert 'PIPELINE WARNINGS' in result or 'Pipeline warnings' in result
 
 
-def test_generate_no_fallback_note_when_not_used():
+def test_generate_no_warnings_when_no_errors():
     result = generate_email_html(make_summary(used_fallback=False))
+    assert 'Pipeline warnings' not in result
     assert 'AI summarization unavailable' not in result
+
+
+def test_generate_warnings_appear_before_stories():
+    fallback_msg = 'AI summarization unavailable — showing extracted headlines.'
+    result = generate_email_html(make_summary(), errors=[fallback_msg])
+    warning_idx = result.find('Pipeline warnings')
+    story_idx = result.find('Leaders reach trade deal at summit')
+    assert warning_idx != -1 and story_idx != -1
+    assert warning_idx < story_idx
 
 
 def test_generate_no_story_count_in_masthead():

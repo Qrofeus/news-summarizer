@@ -1,4 +1,7 @@
+import argparse
+import json
 import logging
+import os
 import traceback
 
 from config import Config
@@ -10,81 +13,110 @@ from summarizers.gemini import GeminiSummarizer
 from summarizers.fallback import FallbackSummarizer
 from mailer.generator import generate_email_html
 from mailer.sender import send_digest
-from scrapers.utils import dedupe_articles, sort_proportional
+from scrapers.utils import prepare_articles
 from utils.logging_config import setup_logging
 from utils.error_notifier import send_error_email
-
-_SKIP_CATEGORIES = {
-    'sport', 'sports', 'culture', 'lifestyle', 'film', 'music', 'books',
-    'stage', 'food', 'travel', 'fashion', 'entertainment', 'celebrity',
-    'tv and radio', 'tv-and-radio', 'games', 'crosswords', 'environment',
-    'lifeandstyle', 'artanddesign', 'commentisfree',
-}
-_MAX_ARTICLES = 50
 
 
 class InsufficientDataError(Exception):
     pass
 
 
-def _prepare_articles(all_articles):
-    filtered = [
-        a for a in all_articles
-        if not a.category or a.category.lower() not in _SKIP_CATEGORIES
-    ]
-    deduped = dedupe_articles(filtered)
-    picked = sort_proportional(deduped, _MAX_ARTICLES)
-    logging.info(f'Filter+dedup+proportional: {len(all_articles)} -> {len(filtered)} -> {len(deduped)} -> {len(picked)}')
-    return picked
+def _fetch_all(config):
+    scrapers = [BBCScraper(config), GuardianScraper(config), WorldNewsScraper(config)]
+    articles, errors = [], []
+    for scraper in scrapers:
+        try:
+            fetched = scraper.fetch_articles(hours=24)
+            articles.extend(fetched)
+            logging.info(f"{scraper.get_source_name()}: {len(fetched)} articles fetched")
+        except Exception as e:
+            errors.append(f"{scraper.get_source_name()}: {e}")
+            logging.warning(f"Scraper {scraper.get_source_name()} failed: {e}")
+    return articles, errors
+
+
+def _summarize(articles, config, errors):
+    summarizer: Summarizer = GeminiSummarizer(api_key=config.gemini_api_key)
+    try:
+        return summarizer.summarize(articles)
+    except Exception as e:
+        logging.error(f"LLM failed: {e}")
+        if not config.enable_fallback:
+            raise
+        reason = str(e).split('\n', 1)[0].strip()
+        if len(reason) > 160:
+            reason = reason[:160].rstrip() + '…'
+        errors.append(
+            f"AI summarization unavailable — Gemini failed ({reason}). "
+            "Showing raw extracted headlines instead of the curated brief."
+        )
+        return FallbackSummarizer().summarize(articles)
 
 
 def run_daily_digest() -> None:
     setup_logging()
     config = Config.from_env()
 
-    run_errors = []
-    all_articles = []
-
-    scrapers = [BBCScraper(config), GuardianScraper(config), WorldNewsScraper(config)]
-    for scraper in scrapers:
-        try:
-            articles = scraper.fetch_articles(hours=24)
-            all_articles.extend(articles)
-            logging.info(f"{scraper.get_source_name()}: {len(articles)} articles fetched")
-        except Exception as e:
-            run_errors.append(f"{scraper.get_source_name()}: {str(e)}")
-            logging.warning(f"Scraper {scraper.get_source_name()} failed: {e}")
-
+    all_articles, errors = _fetch_all(config)
     if len(all_articles) < 5:
         raise InsufficientDataError(f"Only {len(all_articles)} articles scraped")
 
-    articles = _prepare_articles(all_articles)
+    articles = prepare_articles(all_articles)
+    summary = _summarize(articles, config, errors)
 
-    summarizer: Summarizer = GeminiSummarizer(api_key=config.gemini_api_key)
-    try:
-        summary = summarizer.summarize(articles)
-    except Exception as e:
-        logging.error(f"LLM failed: {e}")
-        if config.enable_fallback:
-            summarizer = FallbackSummarizer()
-            summary = summarizer.summarize(articles)
-            run_errors.append("LLM summarization failed, using fallback")
-        else:
-            raise
-
-    email_html = generate_email_html(summary, run_errors)
+    email_html = generate_email_html(summary, errors)
     result = send_digest(email_html, config)
     logging.info(f"Digest sent: {result}")
 
 
+def run_preview(out_dir: str) -> None:
+    setup_logging()
+    config = Config.from_env()
+
+    all_articles, errors = _fetch_all(config)
+    articles = prepare_articles(all_articles)
+
+    os.makedirs(out_dir, exist_ok=True)
+    with open(os.path.join(out_dir, 'input_articles.json'), 'w', encoding='utf-8') as f:
+        json.dump(
+            [{'title': a.title, 'url': a.url, 'source': a.source, 'category': a.category} for a in articles],
+            f, indent=2, ensure_ascii=False,
+        )
+
+    summary = _summarize(articles, config, errors)
+    html_out = generate_email_html(summary, errors)
+
+    html_path = os.path.join(out_dir, 'digest_preview.html')
+    json_path = os.path.join(out_dir, 'summary_payload.json')
+    with open(html_path, 'w', encoding='utf-8') as f:
+        f.write(html_out)
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump({
+            'stories': summary.stories,
+            'article_count': summary.article_count,
+            'used_fallback': summary.used_fallback,
+        }, f, indent=2, ensure_ascii=False)
+
+    logging.info(f"Preview saved: {html_path} ({len(html_out):,} chars) / {json_path}")
+
+
 if __name__ == '__main__':
-    try:
-        run_daily_digest()
-    except Exception as e:
-        tb = traceback.format_exc()
-        logging.critical(f"Fatal: {e}\n{tb}")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--preview', nargs='?', const='test-run', default=None,
+                        help='Write digest to this directory (default: test-run) instead of sending email')
+    args = parser.parse_args()
+
+    if args.preview:
+        run_preview(args.preview)
+    else:
         try:
-            send_error_email(str(e), tb, Config.from_env())
-        except Exception:
-            pass
-        raise
+            run_daily_digest()
+        except Exception as e:
+            tb = traceback.format_exc()
+            logging.critical(f"Fatal: {e}\n{tb}")
+            try:
+                send_error_email(str(e), tb, Config.from_env())
+            except Exception:
+                pass
+            raise

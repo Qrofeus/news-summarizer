@@ -46,7 +46,6 @@ def _make_config(**overrides) -> Config:
         admin_email='admin@qrofeus.dev',
         user_agent='TestAgent/1.0',
         request_delay=0.0,
-        enable_llm=True,
         enable_fallback=True,
     )
     base.update(overrides)

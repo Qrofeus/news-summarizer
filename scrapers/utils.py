@@ -1,8 +1,29 @@
+import logging
 import re
 import time
 from typing import List
 
 from models.article import Article
+
+_SKIP_CATEGORIES = {
+    'sport', 'sports', 'culture', 'lifestyle', 'film', 'music', 'books',
+    'stage', 'food', 'travel', 'fashion', 'entertainment', 'celebrity',
+    'tv and radio', 'tv-and-radio', 'games', 'crosswords', 'environment',
+    'lifeandstyle', 'artanddesign', 'commentisfree',
+}
+_MAX_ARTICLES = 50
+
+
+def prepare_articles(all_articles: List[Article]) -> List[Article]:
+    """Category-filter, dedup, and proportional-sort to the digest cap."""
+    filtered = [
+        a for a in all_articles
+        if not a.category or a.category.lower() not in _SKIP_CATEGORIES
+    ]
+    deduped = dedupe_articles(filtered)
+    picked = sort_proportional(deduped, _MAX_ARTICLES)
+    logging.info(f'Filter+dedup+proportional: {len(all_articles)} -> {len(filtered)} -> {len(deduped)} -> {len(picked)}')
+    return picked
 
 
 def dedupe_articles(articles: List[Article]) -> List[Article]:

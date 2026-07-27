@@ -7,7 +7,3 @@ class Summarizer(ABC):
     @abstractmethod
     def summarize(self, articles: List[Article]) -> DigestSummary:
         pass
-
-    @abstractmethod
-    def get_cost_estimate(self, articles: List[Article]) -> float:
-        pass

@@ -23,7 +23,6 @@ def make_config(request_delay=0.0):
         admin_email='test@test.com',
         user_agent='TestAgent/1.0',
         request_delay=request_delay,
-        enable_llm=True,
         enable_fallback=True,
     )
 
@@ -157,9 +156,7 @@ def make_worldnews_response(items):
 
 
 @responses_lib.activate
-@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
-def test_worldnews_fetch_returns_recent_articles(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = True
+def test_worldnews_fetch_returns_recent_articles():
     body = make_worldnews_response([
         {'title': 'Recent', 'url': 'https://example.com/recent', 'hours_ago': 1},
         {'title': 'Old', 'url': 'https://example.com/old', 'hours_ago': 48},
@@ -175,9 +172,7 @@ def test_worldnews_fetch_returns_recent_articles(mock_robots):
 
 
 @responses_lib.activate
-@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
-def test_worldnews_fetch_filters_all_old_articles(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = True
+def test_worldnews_fetch_filters_all_old_articles():
     body = make_worldnews_response([
         {'title': 'Old A', 'url': 'https://example.com/a', 'hours_ago': 25},
         {'title': 'Old B', 'url': 'https://example.com/b', 'hours_ago': 50},
@@ -195,9 +190,7 @@ def test_worldnews_source_name():
 
 
 @responses_lib.activate
-@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
-def test_worldnews_no_text_skips_article(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = True
+def test_worldnews_no_text_skips_article():
     now = datetime.now(timezone.utc)
     results = [
         {
@@ -226,9 +219,7 @@ def test_worldnews_no_text_skips_article(mock_robots):
 
 
 @responses_lib.activate
-@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
-def test_worldnews_api_failure_raises(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = True
+def test_worldnews_api_failure_raises():
     responses_lib.add(responses_lib.GET, WorldNewsScraper.API_URL,
                       body=Exception('Connection refused'))
 
@@ -237,9 +228,7 @@ def test_worldnews_api_failure_raises(mock_robots):
 
 
 @responses_lib.activate
-@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
-def test_worldnews_article_skip_on_bad_data(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = True
+def test_worldnews_article_skip_on_bad_data():
     now = datetime.now(timezone.utc)
     results = [
         {'title': 'Bad date', 'url': 'https://example.com/x',
@@ -256,14 +245,6 @@ def test_worldnews_article_skip_on_bad_data(mock_robots):
 
     assert len(articles) == 1
     assert articles[0].title == 'Good'
-
-
-@patch('scrapers.worldnews.WorldNewsScraper._get_robots')
-def test_worldnews_robots_disallowed_raises(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = False
-
-    with pytest.raises(PermissionError):
-        WorldNewsScraper(make_config()).fetch_articles(hours=24)
 
 
 # ── Guardian ──────────────────────────────────────────────────────────────────
@@ -285,9 +266,7 @@ def make_guardian_response(items):
 
 
 @responses_lib.activate
-@patch('scrapers.guardian.GuardianScraper._get_robots')
-def test_guardian_fetch_returns_recent_articles(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = True
+def test_guardian_fetch_returns_recent_articles():
     body = make_guardian_response([
         {'title': 'Recent', 'url': 'https://www.theguardian.com/recent', 'hours_ago': 1},
         {'title': 'Old', 'url': 'https://www.theguardian.com/old', 'hours_ago': 48},
@@ -303,9 +282,7 @@ def test_guardian_fetch_returns_recent_articles(mock_robots):
 
 
 @responses_lib.activate
-@patch('scrapers.guardian.GuardianScraper._get_robots')
-def test_guardian_fetch_filters_all_old_articles(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = True
+def test_guardian_fetch_filters_all_old_articles():
     body = make_guardian_response([
         {'title': 'Old A', 'url': 'https://www.theguardian.com/a', 'hours_ago': 25},
         {'title': 'Old B', 'url': 'https://www.theguardian.com/b', 'hours_ago': 50},
@@ -323,9 +300,7 @@ def test_guardian_source_name():
 
 
 @responses_lib.activate
-@patch('scrapers.guardian.GuardianScraper._get_robots')
-def test_guardian_no_body_text_skips_article(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = True
+def test_guardian_no_body_text_skips_article():
     now = datetime.now(timezone.utc)
     results = [
         {
@@ -354,9 +329,7 @@ def test_guardian_no_body_text_skips_article(mock_robots):
 
 
 @responses_lib.activate
-@patch('scrapers.guardian.GuardianScraper._get_robots')
-def test_guardian_api_failure_raises(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = True
+def test_guardian_api_failure_raises():
     responses_lib.add(responses_lib.GET, GuardianScraper.API_URL,
                       body=Exception('Connection refused'))
 
@@ -365,9 +338,7 @@ def test_guardian_api_failure_raises(mock_robots):
 
 
 @responses_lib.activate
-@patch('scrapers.guardian.GuardianScraper._get_robots')
-def test_guardian_article_skip_on_bad_data(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = True
+def test_guardian_article_skip_on_bad_data():
     now = datetime.now(timezone.utc)
     results = [
         {'webTitle': 'Missing date', 'webUrl': 'https://www.theguardian.com/x',
@@ -385,11 +356,3 @@ def test_guardian_article_skip_on_bad_data(mock_robots):
 
     assert len(articles) == 1
     assert articles[0].title == 'Good'
-
-
-@patch('scrapers.guardian.GuardianScraper._get_robots')
-def test_guardian_robots_disallowed_raises(mock_robots):
-    mock_robots.return_value.can_fetch.return_value = False
-
-    with pytest.raises(PermissionError):
-        GuardianScraper(make_config()).fetch_articles(hours=24)

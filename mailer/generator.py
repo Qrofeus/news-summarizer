@@ -78,10 +78,6 @@ def generate_email_html(summary: DigestSummary, errors: Optional[List[str]] = No
     stories = summary.stories or []
     stories_html = '\n\n'.join(_render_story(s, i) for i, s in enumerate(stories))
     errors_html = _render_errors(errors or [])
-    fallback_note = (
-        '<p class="fallback-note">AI summarization unavailable &mdash; showing extracted headlines.</p>'
-        if summary.used_fallback else ''
-    )
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -121,16 +117,6 @@ def generate_email_html(summary: DigestSummary, errors: Optional[List[str]] = No
     }}
 
     .content {{ padding: 12px 24px 40px; }}
-
-    .fallback-note {{
-      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      font-size: 12px;
-      background: #EAF3FB;
-      border-left: 3px solid #1D4E89;
-      padding: 10px 14px;
-      margin: 24px 0;
-      color: #555;
-    }}
 
     .story {{
       padding-top: 36px;
@@ -200,12 +186,13 @@ def generate_email_html(summary: DigestSummary, errors: Optional[List[str]] = No
 
     .errors {{
       font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      font-size: 11px;
+      font-size: 12px;
+      line-height: 1.55;
       background: #FEF9EC;
       border-left: 3px solid #C89A00;
-      padding: 12px 16px;
-      margin-top: 32px;
-      color: #666;
+      padding: 14px 16px;
+      margin: 20px 0 8px;
+      color: #5A4B00;
     }}
     .errors strong {{
       display: block;
@@ -239,9 +226,8 @@ def generate_email_html(summary: DigestSummary, errors: Optional[List[str]] = No
   </div>
 
   <div class="content">
-{fallback_note}
-{stories_html}
 {errors_html}
+{stories_html}
     <footer>
       <p>Daily News Digest &nbsp;&middot;&nbsp; <a href="mailto:{_CONTACT_EMAIL}">Report an issue</a></p>
     </footer>

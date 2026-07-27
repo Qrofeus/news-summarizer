@@ -5,7 +5,6 @@ from email.utils import parsedate_to_datetime
 from typing import List
 from urllib.robotparser import RobotFileParser
 
-import requests
 from newspaper import Article as NewspaperArticle
 
 from config import Config
@@ -19,10 +18,8 @@ class BBCScraper(NewsSource):
     ROBOTS_URL = 'https://www.bbc.com/robots.txt'
 
     def __init__(self, config: Config):
-        self.config = config
+        super().__init__(config)
         self.rate_limiter = RateLimiter(delay=config.request_delay)
-        self.session = requests.Session()
-        self.session.headers['User-Agent'] = config.user_agent
         self._robots: RobotFileParser | None = None
 
     def get_source_name(self) -> str:

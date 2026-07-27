@@ -163,17 +163,6 @@ def test_cross_story_url_dedup(mock_configure, mock_model_cls):
     assert len(result.stories) == 1
 
 
-@patch('summarizers.gemini.genai.configure')
-def test_get_cost_estimate_scales_with_articles(mock_configure):
-    summarizer = GeminiSummarizer('test-key')
-
-    cost_5 = summarizer.get_cost_estimate(make_articles(5))
-    cost_10 = summarizer.get_cost_estimate(make_articles(10))
-
-    assert cost_10 > cost_5
-    assert isinstance(cost_5, float)
-
-
 # ── FallbackSummarizer ────────────────────────────────────────────────────────
 
 def make_article(title, content, source='BBC', url='https://example.com/a'):
@@ -197,32 +186,15 @@ def test_fallback_article_count_correct():
     assert result.article_count == 5
 
 
-def test_fallback_cost_estimate_zero():
-    assert FallbackSummarizer().get_cost_estimate(make_articles(10)) == 0.0
-
-
-def test_fallback_categorizes_politics():
-    article = make_article('Senate votes on new policy', 'Congress passed legislation after the election campaign.')
-    result = FallbackSummarizer().summarize([article])
-    assert result.stories[0]['category'] == 'Politics'
-
-
-def test_fallback_categorizes_technology():
-    article = make_article('New AI chip released', 'Silicon valley startup unveils machine learning semiconductor.')
-    result = FallbackSummarizer().summarize([article])
-    assert result.stories[0]['category'] == 'Technology'
-
-
-def test_fallback_categorizes_health():
-    article = make_article('FDA approves new vaccine', 'Clinical trials showed the drug effective against the virus.')
-    result = FallbackSummarizer().summarize([article])
-    assert result.stories[0]['category'] == 'Health'
-
-
-def test_fallback_defaults_to_other_on_no_keywords():
-    article = make_article('Something happened', 'A very generic text with no specific words at all.')
-    result = FallbackSummarizer().summarize([article])
-    assert result.stories[0]['category'] == 'Other'
+def test_fallback_all_stories_category_is_other():
+    articles = [
+        make_article('Senate votes on new policy', 'Congress passed legislation after the election campaign.'),
+        make_article('New AI chip released', 'Silicon valley startup unveils machine learning semiconductor.'),
+        make_article('Something generic', 'A very generic text.'),
+    ]
+    result = FallbackSummarizer().summarize(articles)
+    for story in result.stories:
+        assert story['category'] == 'Other'
 
 
 def test_fallback_story_has_expected_keys():

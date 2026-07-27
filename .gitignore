@@ -11,3 +11,7 @@ logs/*.log
 db_config.php
 \[private\]*
 output/
+test-run/*.html
+test-run/*.json
+test-run/experiments/
+*.stackdump

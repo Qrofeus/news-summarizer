@@ -23,7 +23,6 @@ def make_config():
         admin_email='admin@qrofeus.dev',
         user_agent='TestAgent/1.0',
         request_delay=0.0,
-        enable_llm=True,
         enable_fallback=True,
     )
 

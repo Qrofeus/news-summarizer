@@ -21,7 +21,6 @@ class Config:
     admin_email: str
     user_agent: str
     request_delay: float
-    enable_llm: bool
     enable_fallback: bool
 
     @classmethod
@@ -42,6 +41,5 @@ class Config:
             admin_email=os.getenv('ADMIN_EMAIL'),
             user_agent=os.getenv('USER_AGENT', 'NewsDigest/1.0'),
             request_delay=float(os.getenv('REQUEST_DELAY', 2.5)),
-            enable_llm=os.getenv('ENABLE_LLM', 'true').lower() == 'true',
             enable_fallback=os.getenv('ENABLE_FALLBACK', 'true').lower() == 'true',
         )

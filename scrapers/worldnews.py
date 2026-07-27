@@ -1,34 +1,19 @@
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import List
-from urllib.robotparser import RobotFileParser
-
-import requests
 
 from config import Config
 from models.article import Article
 from scrapers.base import NewsSource
-from scrapers.utils import RateLimiter
 
 
 class WorldNewsScraper(NewsSource):
     API_URL = 'https://api.worldnewsapi.com/search-news'
 
-    def __init__(self, config: Config):
-        self.config = config
-        self.rate_limiter = RateLimiter(delay=config.request_delay)
-        self.session = requests.Session()
-        self.session.headers['User-Agent'] = config.user_agent
-        self._robots: RobotFileParser | None = None
-
     def get_source_name(self) -> str:
         return 'World News'
 
     def fetch_articles(self, hours: int = 24) -> List[Article]:
-        robots = self._get_robots()
-        if not robots.can_fetch(self.config.user_agent, self.API_URL):
-            raise PermissionError(f'robots.txt disallows fetching {self.API_URL}')
-
         cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
         results = self._fetch_api(cutoff)
 
@@ -59,15 +44,6 @@ class WorldNewsScraper(NewsSource):
                 logging.warning(f'WorldNews: skipping result with bad data: {e}')
 
         return articles
-
-    def _get_robots(self) -> RobotFileParser:
-        if self._robots is None:
-            rp = RobotFileParser()
-            # api.worldnewsapi.com/robots.txt requires auth; authorized API access
-            # is not subject to robots.txt restrictions.
-            rp.allow_all = True
-            self._robots = rp
-        return self._robots
 
     def _fetch_api(self, cutoff: datetime) -> List[dict]:
         params = {

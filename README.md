@@ -19,10 +19,17 @@ pip install -r requirements.txt
 cp .env.example .env          # fill in your keys
 ```
 
-Preview the digest locally (no email sent, output saved to `output/digest_preview.html`):
+Preview the digest locally (no email sent, output saved to `test-run/digest_preview.html` and `test-run/summary_payload.json`):
 
 ```bash
-python dry_run_preview.py
+python main.py --preview            # writes to ./test-run/
+python main.py --preview my-dir     # writes to ./my-dir/
+```
+
+Run the real pipeline (sends email):
+
+```bash
+python main.py
 ```
 
 ### Environment variables
@@ -39,7 +46,7 @@ python dry_run_preview.py
 | `SMTP_FROM` | From address (defaults to `SMTP_USER`) |
 | `RECIPIENTS` | Comma-separated list of recipient email addresses |
 | `ADMIN_EMAIL` | Error notification recipient |
-| `ENABLE_LLM` | `true` to use Gemini (default), `false` to force fallback |
+| `ENABLE_FALLBACK` | `true` (default) to use fallback summarizer if Gemini fails |
 | `REQUEST_DELAY` | Seconds between scraper requests (default `2.5`) |
 
 ## Sources
@@ -50,13 +57,13 @@ python dry_run_preview.py
 | The Guardian | Content API (`show-fields=bodyText`) |
 | World News API | REST API (`/search-news`, `language=en`, `source-countries=us,gb`) |
 
-All scrapers check `robots.txt`, enforce request delays, and skip articles older than 24 hours. Non-news categories (sport, culture, entertainment, etc.) are filtered out before summarization. Up to 60 articles per run, sorted newest-first.
+BBC checks `robots.txt` and enforces request delays. Non-news categories (sport, culture, entertainment, etc.) are filtered out before summarization. Up to 50 articles per run, selected via proportional per-source sort so each source contributes fairly to the pool.
 
 ## Summarization
 
-Primary: **Gemini 2.5 Flash Lite** - receives the title + first 300 chars of each article, categorizes into Politics, Business, Technology, World, Health, or Other; groups by topic; writes one paragraph per group. Retries up to 3 times on transient API failures.
+Primary: **Gemini 2.5 Flash Lite** — receives the title + first 300 chars of each article, curates a 5–10 story digest with category tags, cross-source clustering, and `Perspectives & Angles` blockquotes for multi-source stories. Retries up to 3 times on transient API failures.
 
-Fallback (on API failure): keyword scoring with word-boundary matching, first-two-sentence extraction. No external dependencies.
+Fallback (on API failure): first-two-sentence extraction, first 10 articles, all tagged `Other`. No external dependencies.
 
 ## Email delivery
 

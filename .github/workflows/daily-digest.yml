@@ -11,7 +11,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -34,7 +34,5 @@ jobs:
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
           USER_AGENT: 'DailyNewsDigest/1.0 (+https://qrofeus.dev)'
           REQUEST_DELAY: '2.5'
-          ENABLE_LLM: 'true'
           ENABLE_FALLBACK: 'true'
-          DRY_RUN: 'false'
         run: python main.py
