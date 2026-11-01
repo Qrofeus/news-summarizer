@@ -12,6 +12,7 @@ import pytest
 from config import Config
 from models.article import Article, DigestSummary
 from main import run_daily_digest, InsufficientDataError
+from summarizers.gemini import MODEL
 
 _FIXTURES = Path(__file__).parent.parent / 'fixtures' / 'sample_articles.json'
 
@@ -123,6 +124,7 @@ def test_pipeline_uses_fallback_when_gemini_fails(
     run_daily_digest()
 
     mock_fallback.return_value.summarize.assert_called_once()
+    assert f'AI summarization unavailable: {MODEL} failed (quota exceeded)' in mock_send.call_args[0][0]
 
 
 # ── Scraper isolation ─────────────────────────────────────────────────────────

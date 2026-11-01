@@ -9,7 +9,7 @@ from scrapers.bbc import BBCScraper
 from scrapers.guardian import GuardianScraper
 from scrapers.worldnews import WorldNewsScraper
 from summarizers.base import Summarizer
-from summarizers.gemini import GeminiSummarizer
+from summarizers.gemini import GeminiSummarizer, MODEL
 from summarizers.fallback import FallbackSummarizer
 from mailer.generator import generate_email_html
 from mailer.sender import send_digest
@@ -44,11 +44,12 @@ def _summarize(articles, config, errors):
         logging.error(f"LLM failed: {e}")
         if not config.enable_fallback:
             raise
-        reason = str(e).split('\n', 1)[0].strip()
+        # google-genai APIError carries a clean .message; str(e) embeds the raw JSON response
+        reason = getattr(e, 'message', None) or str(e).split('\n', 1)[0].strip()
         if len(reason) > 160:
             reason = reason[:160].rstrip() + '…'
         errors.append(
-            f"AI summarization unavailable — Gemini failed ({reason}). "
+            f"AI summarization unavailable: {MODEL} failed ({reason}). "
             "Showing raw extracted headlines instead of the curated brief."
         )
         return FallbackSummarizer().summarize(articles)

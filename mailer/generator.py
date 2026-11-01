@@ -1,9 +1,11 @@
 import html
+import re
 from typing import List, Optional
 
 from models.article import DigestSummary
 
 _CONTACT_EMAIL = 'hello@qrofeus.dev'
+_DASHES = re.compile(r'\s*\u2014\s*|\s+\u2013\s+')
 
 _CATEGORY_HUES = {
     'Politics': '#8B2E2E',
@@ -79,12 +81,12 @@ def generate_email_html(summary: DigestSummary, errors: Optional[List[str]] = No
     stories_html = '\n\n'.join(_render_story(s, i) for i, s in enumerate(stories))
     errors_html = _render_errors(errors or [])
 
-    return f"""<!DOCTYPE html>
+    html_out = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daily Brief &mdash; {html.escape(date_str)}</title>
+  <title>Daily Brief | {html.escape(date_str)}</title>
   <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{
@@ -234,3 +236,5 @@ def generate_email_html(summary: DigestSummary, errors: Optional[List[str]] = No
   </div>
 </body>
 </html>"""
+    # No em/en dashes in user-facing text: spaced dashes become commas, range dashes hyphens
+    return _DASHES.sub(', ', html_out).replace('\u2013', '-')

@@ -5,21 +5,21 @@ import time
 from datetime import datetime, timezone
 from typing import List
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 from models.article import Article, DigestSummary
 from summarizers.base import Summarizer
 from summarizers.prompts import GEMINI_PROMPT
 
-_MODEL = 'gemini-2.5-flash-lite'
+MODEL = 'gemma-4-31b-it'
 _MAX_RETRIES = 3
 _RETRY_DELAY = 10
 
 
 class GeminiSummarizer(Summarizer):
     def __init__(self, api_key: str):
-        genai.configure(api_key=api_key)
-        self._model = genai.GenerativeModel(_MODEL)
+        self._client = genai.Client(api_key=api_key)
 
     def summarize(self, articles: List[Article]) -> DigestSummary:
         prompt = self._build_prompt(articles)
@@ -28,7 +28,13 @@ class GeminiSummarizer(Summarizer):
         last_error = None
         for attempt in range(_MAX_RETRIES):
             try:
-                response = self._model.generate_content(prompt)
+                response = self._client.models.generate_content(
+                    model=MODEL,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(response_mime_type='application/json'),
+                )
+                u = response.usage_metadata
+                logging.info(f'Gemini usage: in={u.prompt_token_count} out={u.candidates_token_count} thinking={u.thoughts_token_count}')
                 data = self._parse_response(response.text)
                 stories = self._sanitize_stories(data.get('stories', []))
                 self._log_dropped(articles, stories)

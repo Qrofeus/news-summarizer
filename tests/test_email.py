@@ -162,7 +162,7 @@ def test_generate_escapes_html_in_story_title():
 
 
 def test_generate_renders_fallback_warning_from_errors():
-    fallback_msg = 'AI summarization unavailable — Gemini failed (some reason). Showing raw extracted headlines instead of the curated brief.'
+    fallback_msg = 'AI summarization unavailable: gemma-4-31b-it failed (some reason). Showing raw extracted headlines instead of the curated brief.'
     result = generate_email_html(make_summary(used_fallback=True), errors=[fallback_msg])
     assert 'AI summarization unavailable' in result
     assert 'PIPELINE WARNINGS' in result or 'Pipeline warnings' in result
@@ -175,12 +175,19 @@ def test_generate_no_warnings_when_no_errors():
 
 
 def test_generate_warnings_appear_before_stories():
-    fallback_msg = 'AI summarization unavailable — showing extracted headlines.'
+    fallback_msg = 'AI summarization unavailable: showing extracted headlines.'
     result = generate_email_html(make_summary(), errors=[fallback_msg])
     warning_idx = result.find('Pipeline warnings')
     story_idx = result.find('Leaders reach trade deal at summit')
     assert warning_idx != -1 and story_idx != -1
     assert warning_idx < story_idx
+
+
+def test_generate_strips_em_and_en_dashes():
+    em, en = chr(0x2014), chr(0x2013)
+    result = generate_email_html(make_summary(), errors=[f'Gemini failed {em} quota hit, 2{en}4 retries {en} gave up'])
+    assert em not in result and en not in result
+    assert 'Gemini failed, quota hit, 2-4 retries, gave up' in result
 
 
 def test_generate_no_story_count_in_masthead():

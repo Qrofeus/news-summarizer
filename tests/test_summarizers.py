@@ -32,10 +32,9 @@ def make_api_response(stories=None):
     return json.dumps({'stories': stories})
 
 
-@patch('summarizers.gemini.genai.GenerativeModel')
-@patch('summarizers.gemini.genai.configure')
-def test_summarize_returns_digest_summary(mock_configure, mock_model_cls):
-    mock_model_cls.return_value.generate_content.return_value.text = make_api_response()
+@patch('summarizers.gemini.genai.Client')
+def test_summarize_returns_digest_summary(mock_client_cls):
+    mock_client_cls.return_value.models.generate_content.return_value.text = make_api_response()
 
     result = GeminiSummarizer('test-key').summarize(make_articles(3))
 
@@ -46,68 +45,61 @@ def test_summarize_returns_digest_summary(mock_configure, mock_model_cls):
     assert result.stories[0]['category'] == 'Politics'
 
 
-@patch('summarizers.gemini.genai.GenerativeModel')
-@patch('summarizers.gemini.genai.configure')
-def test_summarize_strips_json_code_fence(mock_configure, mock_model_cls):
+@patch('summarizers.gemini.genai.Client')
+def test_summarize_strips_json_code_fence(mock_client_cls):
     raw = '```json\n' + make_api_response() + '\n```'
-    mock_model_cls.return_value.generate_content.return_value.text = raw
+    mock_client_cls.return_value.models.generate_content.return_value.text = raw
 
     result = GeminiSummarizer('test-key').summarize(make_articles())
 
     assert result.stories[0]['title'] == 'A story headline'
 
 
-@patch('summarizers.gemini.genai.GenerativeModel')
-@patch('summarizers.gemini.genai.configure')
-def test_summarize_strips_plain_code_fence(mock_configure, mock_model_cls):
+@patch('summarizers.gemini.genai.Client')
+def test_summarize_strips_plain_code_fence(mock_client_cls):
     raw = '```\n' + make_api_response() + '\n```'
-    mock_model_cls.return_value.generate_content.return_value.text = raw
+    mock_client_cls.return_value.models.generate_content.return_value.text = raw
 
     result = GeminiSummarizer('test-key').summarize(make_articles())
 
     assert result.stories[0]['title'] == 'A story headline'
 
 
-@patch('summarizers.gemini.genai.GenerativeModel')
-@patch('summarizers.gemini.genai.configure')
-def test_summarize_raises_on_invalid_json(mock_configure, mock_model_cls):
-    mock_model_cls.return_value.generate_content.return_value.text = 'not valid json'
+@patch('summarizers.gemini.genai.Client')
+def test_summarize_raises_on_invalid_json(mock_client_cls):
+    mock_client_cls.return_value.models.generate_content.return_value.text = 'not valid json'
 
     with pytest.raises(json.JSONDecodeError):
         GeminiSummarizer('test-key').summarize(make_articles())
 
 
-@patch('summarizers.gemini.genai.GenerativeModel')
-@patch('summarizers.gemini.genai.configure')
-def test_summarize_empty_stories_on_missing_key(mock_configure, mock_model_cls):
-    mock_model_cls.return_value.generate_content.return_value.text = '{"wrong": {}}'
+@patch('summarizers.gemini.genai.Client')
+def test_summarize_empty_stories_on_missing_key(mock_client_cls):
+    mock_client_cls.return_value.models.generate_content.return_value.text = '{"wrong": {}}'
 
     result = GeminiSummarizer('test-key').summarize(make_articles())
     assert result.stories == []
 
 
-@patch('summarizers.gemini.genai.GenerativeModel')
-@patch('summarizers.gemini.genai.configure')
-def test_summarize_raises_on_api_error(mock_configure, mock_model_cls):
-    mock_model_cls.return_value.generate_content.side_effect = RuntimeError('API quota exceeded')
+@patch('summarizers.gemini.genai.Client')
+def test_summarize_raises_on_api_error(mock_client_cls):
+    mock_client_cls.return_value.models.generate_content.side_effect = RuntimeError('API quota exceeded')
 
     with pytest.raises(RuntimeError):
         GeminiSummarizer('test-key').summarize(make_articles())
 
 
-@patch('summarizers.gemini.genai.GenerativeModel')
-@patch('summarizers.gemini.genai.configure')
-def test_article_count_matches_input(mock_configure, mock_model_cls):
-    mock_model_cls.return_value.generate_content.return_value.text = make_api_response()
+@patch('summarizers.gemini.genai.Client')
+def test_article_count_matches_input(mock_client_cls):
+    mock_client_cls.return_value.models.generate_content.return_value.text = make_api_response()
 
     result = GeminiSummarizer('test-key').summarize(make_articles(7))
 
     assert result.article_count == 7
 
 
-@patch('summarizers.gemini.genai.GenerativeModel')
-@patch('summarizers.gemini.genai.configure')
-def test_perspectives_stripped_on_single_source(mock_configure, mock_model_cls):
+@patch('summarizers.gemini.genai.Client')
+def test_perspectives_stripped_on_single_source(mock_client_cls):
     stories = [{
         'title': 'Solo story',
         'category': 'World',
@@ -115,15 +107,14 @@ def test_perspectives_stripped_on_single_source(mock_configure, mock_model_cls):
         'articles': [{'title': 'A', 'url': 'https://x.com/1', 'source': 'BBC'}],
         'perspectives': [{'source': 'BBC', 'angle': 'framed as X'}],
     }]
-    mock_model_cls.return_value.generate_content.return_value.text = json.dumps({'stories': stories})
+    mock_client_cls.return_value.models.generate_content.return_value.text = json.dumps({'stories': stories})
 
     result = GeminiSummarizer('test-key').summarize(make_articles())
     assert 'perspectives' not in result.stories[0]
 
 
-@patch('summarizers.gemini.genai.GenerativeModel')
-@patch('summarizers.gemini.genai.configure')
-def test_perspectives_kept_on_multi_source(mock_configure, mock_model_cls):
+@patch('summarizers.gemini.genai.Client')
+def test_perspectives_kept_on_multi_source(mock_client_cls):
     stories = [{
         'title': 'Cross-source story',
         'category': 'World',
@@ -137,15 +128,14 @@ def test_perspectives_kept_on_multi_source(mock_configure, mock_model_cls):
             {'source': 'Reuters', 'angle': 'framed as Y'},
         ],
     }]
-    mock_model_cls.return_value.generate_content.return_value.text = json.dumps({'stories': stories})
+    mock_client_cls.return_value.models.generate_content.return_value.text = json.dumps({'stories': stories})
 
     result = GeminiSummarizer('test-key').summarize(make_articles())
     assert len(result.stories[0].get('perspectives', [])) == 2
 
 
-@patch('summarizers.gemini.genai.GenerativeModel')
-@patch('summarizers.gemini.genai.configure')
-def test_cross_story_url_dedup(mock_configure, mock_model_cls):
+@patch('summarizers.gemini.genai.Client')
+def test_cross_story_url_dedup(mock_client_cls):
     stories = [
         {
             'title': 'First', 'category': 'World', 'summary': 's1',
@@ -156,7 +146,7 @@ def test_cross_story_url_dedup(mock_configure, mock_model_cls):
             'articles': [{'title': 'A', 'url': 'https://x.com/1', 'source': 'BBC'}],
         },
     ]
-    mock_model_cls.return_value.generate_content.return_value.text = json.dumps({'stories': stories})
+    mock_client_cls.return_value.models.generate_content.return_value.text = json.dumps({'stories': stories})
 
     result = GeminiSummarizer('test-key').summarize(make_articles())
     # Second story loses its only article and is dropped

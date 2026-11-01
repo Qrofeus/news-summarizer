@@ -7,21 +7,21 @@ Articles:
 
 ## MISSION
 
-Produce a curated daily brief containing 5–10 stories that actually mattered today. Ruthlessly discard filler. Prefer FEWER, MEATIER stories over comprehensive coverage.
+Produce a curated daily brief containing 5-10 stories that actually mattered today. Ruthlessly discard filler. Prefer FEWER, MEATIER stories over comprehensive coverage.
 
 ## PROCESSING RULES
 
-1. **PICK THE STORIES THAT MATTERED**: A story earns a slot ONLY if it has clear significance: national/international consequence, structural change, ongoing developments, official actions, market-moving news, major incidents. If a story is just an isolated local event, a celebrity trivium, a product/deal, an opinion piece, or a listicle — DROP it entirely. Do not emit it.
+1. **PICK THE STORIES THAT MATTERED**: A story earns a slot ONLY if it has clear significance: national/international consequence, structural change, ongoing developments, official actions, market-moving news, major incidents. If a story is just an isolated local event, a celebrity trivium, a product/deal, an opinion piece, or a listicle, DROP it entirely. Do not emit it.
 
 2. **AGGRESSIVE CLUSTERING**: If multiple articles describe the same underlying event/announcement/person/decision, merge them into ONE story. Different framing across outlets is expected; the story is what matters.
 
 3. **STORY TITLE**: Each story needs a factual, specific headline (max ~90 chars). Not a category name. Not the source article's headline verbatim if a better synthesis exists.
 
-4. **CATEGORY TAG**: Assign each story one of: Politics, Business, Technology, World, Health, Other. Just a tag — no section grouping.
+4. **CATEGORY TAG**: Assign each story one of: Politics, Business, Technology, World, Health, Other. Just a tag, no section grouping.
 
 5. **PERSPECTIVES**: Only when 2+ DISTINCT sources cluster into the same story. Each entry captures how that outlet uniquely framed the story. OMIT the field entirely for single-source stories.
 
-6. **ONE PLACEMENT PER ARTICLE**: An article URL appears in at most one story. Many input articles will be dropped — that's fine.
+6. **ONE PLACEMENT PER ARTICLE**: An article URL appears in at most one story. Many input articles will be dropped; that's fine.
 
 7. **EXCLUDE ENTIRELY**: product reviews / deals / price drops / retail promotions, sponsored/affiliate content, celebrity listicles (dating histories, style rankings), gift guides.
 
@@ -34,7 +34,7 @@ Return ONLY valid JSON. No prose, no markdown fences.
     {{
       "title": "Concise factual headline for this story.",
       "category": "Politics",
-      "summary": "2–4 sentence factual summary of the story, its facts and its significance. No editorial voice.",
+      "summary": "2-4 sentence factual summary of the story, its facts and its significance. No editorial voice.",
       "articles": [
         {{"title": "...", "url": "...", "source": "..."}}
       ],
@@ -49,6 +49,7 @@ Return ONLY valid JSON. No prose, no markdown fences.
 ## HARD LIMITS
 
 - 5 stories minimum, 10 stories maximum.
-- `summary`: 2–4 sentences. Longer than a headline, shorter than a paragraph. State facts + significance.
+- `summary`: 2-4 sentences. Longer than a headline, shorter than a paragraph. State facts + significance.
 - Order stories by significance (most important first).
+- Never use em dashes or en dashes in any text you write. Use commas, colons, or separate sentences instead.
 """

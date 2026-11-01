@@ -1,6 +1,6 @@
 # Daily News Digest
 
-Automated ETL pipeline that scrapes news from BBC, The Guardian, and World News API, summarizes it with Gemini 2.5 Flash Lite, and delivers a daily HTML digest email via SMTP. Runs at 6 AM UTC via GitHub Actions.
+Automated ETL pipeline that scrapes news from BBC, The Guardian, and World News API, summarizes it with Gemma 4 31B, and delivers a daily HTML digest email via SMTP. Runs at 00:23 UTC via GitHub Actions.
 
 ## Architecture
 
@@ -61,7 +61,7 @@ BBC checks `robots.txt` and enforces request delays. Non-news categories (sport,
 
 ## Summarization
 
-Primary: **Gemini 2.5 Flash Lite** — receives the title + first 300 chars of each article, curates a 5–10 story digest with category tags, cross-source clustering, and `Perspectives & Angles` blockquotes for multi-source stories. Retries up to 3 times on transient API failures.
+Primary: **Gemma 4 31B** — receives the title + first 300 chars of each article, curates a 5–10 story digest with category tags, cross-source clustering, and `Perspectives & Angles` blockquotes for multi-source stories. Retries up to 3 times on transient API failures.
 
 Fallback (on API failure): first-two-sentence extraction, first 10 articles, all tagged `Other`. No external dependencies.
 

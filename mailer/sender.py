@@ -8,7 +8,7 @@ from config import Config
 
 def send_digest(html: str, config: Config) -> dict:
     now = datetime.now(timezone.utc)
-    subject = f"Daily News Digest — {now.strftime('%B')} {now.day}, {now.year}"
+    subject = f"Daily News Digest | {now.strftime('%B')} {now.day}, {now.year}"
 
     sent, failed = 0, []
     with smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=30) as smtp:
