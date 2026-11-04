@@ -265,3 +265,9 @@ def test_send_subject_includes_region(mock_smtp_cls):
     send_digest('<html></html>', ['a@x.com', 'b@x.com'], 'India', make_config())
     assert mock_smtp.sendmail.call_count == 2
     assert 'Subject: Daily News Digest | India |' in mock_smtp.sendmail.call_args[0][2]
+
+
+def test_source_cites_are_space_separated_so_they_wrap():
+    result = generate_email_html(make_summary())
+    assert '</a> <a href=' in result
+    assert '</a><a href=' not in result

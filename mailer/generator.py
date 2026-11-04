@@ -25,7 +25,8 @@ def _source_cites(articles: list) -> str:
         source = html.escape(a.get('source') or 'Source')
         url = html.escape(a.get('url') or '#')
         links.append(f'<a href="{url}">[{source}]</a>')
-    return f'<sup class="cites">{"".join(links)}</sup>'
+    # Space-separated so the row can wrap between links on narrow (mobile) screens
+    return f'<sup class="cites">{" ".join(links)}</sup>'
 
 
 def _render_perspectives(perspectives: list) -> str:
@@ -164,10 +165,8 @@ def generate_email_html(summary: DigestSummary, errors: Optional[List[str]] = No
       line-height: 1;
       margin-left: 4px;
       vertical-align: super;
-      white-space: nowrap;
     }}
-    .cites a {{ color: #1D4E89; text-decoration: none; margin-left: 2px; }}
-    .cites a:first-child {{ margin-left: 0; }}
+    .cites a {{ color: #1D4E89; text-decoration: none; white-space: nowrap; }}
     .cites a:hover {{ text-decoration: underline; }}
 
     .perspectives {{
