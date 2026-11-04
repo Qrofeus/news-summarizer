@@ -17,8 +17,9 @@ class BBCScraper(NewsSource):
     RSS_URL = 'https://feeds.bbci.co.uk/news/rss.xml'
     ROBOTS_URL = 'https://www.bbc.com/robots.txt'
 
-    def __init__(self, config: Config):
-        super().__init__(config)
+    def __init__(self, config: Config, params: dict | None = None):
+        super().__init__(config, params)
+        self.feeds = self.params.get('feeds') or [self.RSS_URL]
         self.rate_limiter = RateLimiter(delay=config.request_delay)
         self._robots: RobotFileParser | None = None
 
@@ -27,11 +28,13 @@ class BBCScraper(NewsSource):
 
     def fetch_articles(self, hours: int = 24) -> List[Article]:
         robots = self._get_robots()
-        if not robots.can_fetch(self.config.user_agent, self.RSS_URL):
-            raise PermissionError(f'robots.txt disallows scraping {self.RSS_URL}')
-
-        rss_xml = self._fetch_rss()
-        items = self._parse_rss(rss_xml, hours)
+        items = []
+        for feed in self.feeds:
+            if not robots.can_fetch(self.config.user_agent, feed):
+                raise PermissionError(f'robots.txt disallows scraping {feed}')
+            items.extend(self._parse_rss(self._fetch_rss(feed), hours))
+        # Regional feeds can overlap; skip duplicate URLs before the slow per-article fetch
+        items = list({i['url']: i for i in items}.values())
 
         articles = []
         for item in items:
@@ -58,8 +61,8 @@ class BBCScraper(NewsSource):
             self._robots = rp
         return self._robots
 
-    def _fetch_rss(self) -> str:
-        response = self.session.get(self.RSS_URL, timeout=10)
+    def _fetch_rss(self, url: str) -> str:
+        response = self.session.get(url, timeout=10)
         response.raise_for_status()
         return response.text
 

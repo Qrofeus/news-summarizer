@@ -1,10 +1,18 @@
+import json
 from dataclasses import dataclass
-from typing import List
+from pathlib import Path
+from typing import Dict, List
 
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
+
+REGIONS_PATH = Path(__file__).parent / 'regions.json'
+
+
+def load_regions() -> dict:
+    return json.loads(REGIONS_PATH.read_text(encoding='utf-8'))
 
 
 @dataclass
@@ -17,7 +25,7 @@ class Config:
     smtp_user: str
     smtp_password: str
     smtp_from: str
-    recipients: List[str]
+    subscribers: Dict[str, List[str]]
     admin_email: str
     user_agent: str
     request_delay: float
@@ -25,8 +33,6 @@ class Config:
 
     @classmethod
     def from_env(cls):
-        recipients_raw = os.getenv('RECIPIENTS', '')
-        recipients = [r.strip() for r in recipients_raw.split(',') if r.strip()]
         smtp_user = os.getenv('SMTP_USER')
         return cls(
             gemini_api_key=os.getenv('GEMINI_API_KEY'),
@@ -37,7 +43,7 @@ class Config:
             smtp_user=smtp_user,
             smtp_password=os.getenv('SMTP_PASSWORD'),
             smtp_from=os.getenv('SMTP_FROM') or smtp_user,
-            recipients=recipients,
+            subscribers=json.loads(os.getenv('SUBSCRIBERS') or '{}'),
             admin_email=os.getenv('ADMIN_EMAIL'),
             user_agent=os.getenv('USER_AGENT', 'NewsDigest/1.0'),
             request_delay=float(os.getenv('REQUEST_DELAY', 2.5)),

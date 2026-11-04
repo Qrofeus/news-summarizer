@@ -1,0 +1,56 @@
+{
+  "GLOBAL": {
+    "label": "Global",
+    "bbc": {"feeds": ["https://feeds.bbci.co.uk/news/rss.xml"]},
+    "guardian": {},
+    "worldnews": {"source-countries": "us,gb"}
+  },
+  "UK": {
+    "label": "United Kingdom",
+    "bbc": {"feeds": ["https://feeds.bbci.co.uk/news/uk/rss.xml"]},
+    "guardian": {"tag": "uk/uk"},
+    "worldnews": {"entities": "LOC:United Kingdom"}
+  },
+  "NORTH_AMERICA": {
+    "label": "North America",
+    "bbc": {"feeds": ["https://feeds.bbci.co.uk/news/world/us_and_canada/rss.xml"]},
+    "guardian": {"tag": "us-news/us-news|world/canada"},
+    "worldnews": {"source-countries": "us,ca"}
+  },
+  "EUROPE": {
+    "label": "Europe",
+    "bbc": {"feeds": ["https://feeds.bbci.co.uk/news/world/europe/rss.xml"]},
+    "guardian": {"tag": "world/europe-news"},
+    "worldnews": {"source-countries": "ie,de,fr,nl,be,es,it,pt,pl,se,dk,no,fi,ch,at,gr"}
+  },
+  "ASIA_PACIFIC": {
+    "label": "Asia-Pacific",
+    "bbc": {"feeds": [
+      "https://feeds.bbci.co.uk/news/world/asia/rss.xml",
+      "https://feeds.bbci.co.uk/news/world/australia/rss.xml"
+    ]},
+    "guardian": {"tag": "world/asia-pacific|world/south-and-central-asia|world/india|world/china|australia-news/australia-news"},
+    "worldnews": {"source-countries": "in,pk,bd,lk,sg,my,ph,id,jp,kr,cn,hk,au,nz"}
+  },
+  "INDIA": {
+    "label": "India",
+    "bbc": {"feeds": ["https://feeds.bbci.co.uk/news/world/asia/india/rss.xml"]},
+    "guardian": {"tag": "world/india"},
+    "worldnews": {"entities": "LOC:India"}
+  },
+  "MIDDLE_EAST_AFRICA": {
+    "label": "Middle East & Africa",
+    "bbc": {"feeds": [
+      "https://feeds.bbci.co.uk/news/world/middle_east/rss.xml",
+      "https://feeds.bbci.co.uk/news/world/africa/rss.xml"
+    ]},
+    "guardian": {"tag": "world/middleeast|world/africa"},
+    "worldnews": {"source-countries": "ae,sa,qa,il,eg,jo,lb,za,ng,ke,gh,ug,tz,zw,et"}
+  },
+  "LATIN_AMERICA": {
+    "label": "Latin America & Caribbean",
+    "bbc": {"feeds": ["https://feeds.bbci.co.uk/news/world/latin_america/rss.xml"]},
+    "guardian": {"tag": "world/americas"},
+    "worldnews": {"source-countries": "mx,br,ar,co,cl,pe,ve,cu,jm,tt"}
+  }
+}

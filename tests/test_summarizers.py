@@ -213,3 +213,28 @@ def test_fallback_caps_at_ten_stories():
     articles = [make_article(f'T{i}', f'Content {i}.') for i in range(25)]
     result = FallbackSummarizer().summarize(articles)
     assert len(result.stories) == 10
+
+
+@patch('summarizers.gemini.genai.Client')
+def test_few_articles_use_thin_prompt_with_region(mock_client_cls):
+    gen = mock_client_cls.return_value.models.generate_content
+    gen.return_value.text = make_api_response()
+
+    GeminiSummarizer('test-key').summarize(make_articles(4), 'India')
+
+    prompt = gen.call_args.kwargs['contents']
+    assert 'Summarize ALL of them' in prompt
+    assert 'readers following: India' in prompt
+
+
+@patch('summarizers.gemini.genai.Client')
+def test_enough_articles_use_curated_prompt(mock_client_cls):
+    gen = mock_client_cls.return_value.models.generate_content
+    gen.return_value.text = make_api_response()
+
+    GeminiSummarizer('test-key').summarize(make_articles(5), 'Europe')
+
+    prompt = gen.call_args.kwargs['contents']
+    assert '5-10 stories' in prompt
+    assert 'Summarize ALL of them' not in prompt
+    assert 'significantly affecting Europe' in prompt

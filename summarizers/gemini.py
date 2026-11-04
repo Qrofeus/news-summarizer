@@ -10,19 +10,20 @@ from google.genai import types
 
 from models.article import Article, DigestSummary
 from summarizers.base import Summarizer
-from summarizers.prompts import GEMINI_PROMPT
+from summarizers.prompts import GEMINI_PROMPT, THIN_PROMPT
 
 MODEL = 'gemma-4-31b-it'
 _MAX_RETRIES = 3
 _RETRY_DELAY = 10
+_THIN_THRESHOLD = 5  # below this, summarize every article instead of curating
 
 
 class GeminiSummarizer(Summarizer):
     def __init__(self, api_key: str):
         self._client = genai.Client(api_key=api_key)
 
-    def summarize(self, articles: List[Article]) -> DigestSummary:
-        prompt = self._build_prompt(articles)
+    def summarize(self, articles: List[Article], region: str = 'Global') -> DigestSummary:
+        prompt = self._build_prompt(articles, region)
         logging.info(f'Calling Gemini with {len(articles)} articles')
 
         last_error = None
@@ -53,13 +54,14 @@ class GeminiSummarizer(Summarizer):
 
         raise last_error
 
-    def _build_prompt(self, articles: List[Article]) -> str:
+    def _build_prompt(self, articles: List[Article], region: str = 'Global') -> str:
         date_str = datetime.now(timezone.utc).strftime('%Y-%m-%d')
         articles_text = '\n\n'.join(
             f'[Article {i + 1}]\nSource: {a.source}\nTitle: {a.title}\nURL: {a.url}\nContent: {a.content[:300]}'
             for i, a in enumerate(articles)
         )
-        return GEMINI_PROMPT.format(date=date_str, articles=articles_text)
+        template = THIN_PROMPT if len(articles) < _THIN_THRESHOLD else GEMINI_PROMPT
+        return template.format(date=date_str, articles=articles_text, region=region)
 
     def _sanitize_stories(self, stories: list) -> list:
         """Cross-story URL dedup (first occurrence wins); strip perspectives on single-source stories."""

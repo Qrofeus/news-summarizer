@@ -19,7 +19,7 @@ def make_config():
         smtp_user='user@example.com',
         smtp_password='pass',
         smtp_from='user@example.com',
-        recipients=['recipient@example.com'],
+        subscribers={'GLOBAL': ['recipient@example.com']},
         admin_email='admin@qrofeus.dev',
         user_agent='TestAgent/1.0',
         request_delay=0.0,

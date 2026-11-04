@@ -19,7 +19,7 @@ def make_config():
         smtp_user='user@example.com',
         smtp_password='pass',
         smtp_from='user@example.com',
-        recipients=['recipient@example.com'],
+        subscribers={'GLOBAL': ['recipient@example.com']},
         admin_email='admin@qrofeus.dev',
         user_agent='TestAgent/1.0',
         request_delay=0.0,
@@ -203,7 +203,7 @@ def test_send_delivers_to_each_recipient(mock_smtp_cls):
     mock_smtp = MagicMock()
     mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_smtp)
     mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
-    result = send_digest('<html>content</html>', make_config())
+    result = send_digest('<html>content</html>', ['recipient@example.com'], 'Global', make_config())
     assert mock_smtp.sendmail.call_count == 1
     assert result['sent'] == 1
     assert result['success'] is True
@@ -214,7 +214,7 @@ def test_send_uses_starttls(mock_smtp_cls):
     mock_smtp = MagicMock()
     mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_smtp)
     mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
-    send_digest('<html></html>', make_config())
+    send_digest('<html></html>', ['recipient@example.com'], 'Global', make_config())
     mock_smtp.starttls.assert_called_once()
 
 
@@ -224,7 +224,7 @@ def test_send_logs_in_with_credentials(mock_smtp_cls):
     mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_smtp)
     mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
     config = make_config()
-    send_digest('<html></html>', config)
+    send_digest('<html></html>', ['recipient@example.com'], 'Global', config)
     mock_smtp.login.assert_called_once_with(config.smtp_user, config.smtp_password)
 
 
@@ -233,7 +233,7 @@ def test_send_returns_result_dict(mock_smtp_cls):
     mock_smtp = MagicMock()
     mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_smtp)
     mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
-    result = send_digest('<html></html>', make_config())
+    result = send_digest('<html></html>', ['recipient@example.com'], 'Global', make_config())
     assert 'success' in result
     assert 'sent' in result
     assert 'failed' in result
@@ -243,4 +243,25 @@ def test_send_returns_result_dict(mock_smtp_cls):
 def test_send_raises_on_connection_error(mock_smtp_cls):
     mock_smtp_cls.side_effect = ConnectionError('Network unreachable')
     with pytest.raises(Exception):
-        send_digest('<html></html>', make_config())
+        send_digest('<html></html>', ['recipient@example.com'], 'Global', make_config())
+
+
+def test_generate_shows_region_in_masthead():
+    result = generate_email_html(make_summary(), region='India')
+    assert 'Daily Brief | India' in result
+
+
+def test_generate_notice_replaces_stories():
+    result = generate_email_html(make_summary(), region='India', notice='No news found for India.')
+    assert 'No news found for India.' in result
+    assert 'Leaders reach trade deal' not in result
+
+
+@patch('mailer.sender.smtplib.SMTP')
+def test_send_subject_includes_region(mock_smtp_cls):
+    mock_smtp = MagicMock()
+    mock_smtp_cls.return_value.__enter__ = MagicMock(return_value=mock_smtp)
+    mock_smtp_cls.return_value.__exit__ = MagicMock(return_value=False)
+    send_digest('<html></html>', ['a@x.com', 'b@x.com'], 'India', make_config())
+    assert mock_smtp.sendmail.call_count == 2
+    assert 'Subject: Daily News Digest | India |' in mock_smtp.sendmail.call_args[0][2]

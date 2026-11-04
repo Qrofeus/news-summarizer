@@ -8,8 +8,10 @@ from models.article import Article
 
 
 class NewsSource(ABC):
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, params: dict | None = None):
+        """`params`: this source's entry for one region in regions.json."""
         self.config = config
+        self.params = params or {}
         self.session = requests.Session()
         self.session.headers['User-Agent'] = config.user_agent
 

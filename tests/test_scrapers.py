@@ -19,7 +19,7 @@ def make_config(request_delay=0.0):
         smtp_user='user@example.com',
         smtp_password='pass',
         smtp_from='user@example.com',
-        recipients=['recipient@example.com'],
+        subscribers={'GLOBAL': ['recipient@example.com']},
         admin_email='test@test.com',
         user_agent='TestAgent/1.0',
         request_delay=request_delay,
@@ -356,3 +356,73 @@ def test_guardian_article_skip_on_bad_data():
 
     assert len(articles) == 1
     assert articles[0].title == 'Good'
+
+
+# ── Region params ─────────────────────────────────────────────────────────────
+
+@responses_lib.activate
+@patch('scrapers.bbc.BBCScraper._get_robots')
+@patch('scrapers.bbc.BBCScraper._fetch_content', return_value='Text.')
+def test_bbc_fetches_every_region_feed_and_dedupes_overlap(mock_content, mock_robots):
+    mock_robots.return_value.can_fetch.return_value = True
+    feed_a, feed_b = 'https://feeds.bbci.co.uk/a.xml', 'https://feeds.bbci.co.uk/b.xml'
+    responses_lib.add(responses_lib.GET, feed_a, body=make_rss_xml([
+        {'title': 'Shared', 'url': 'https://www.bbc.com/news/shared', 'hours_ago': 1},
+        {'title': 'Only A', 'url': 'https://www.bbc.com/news/a', 'hours_ago': 1},
+    ]))
+    responses_lib.add(responses_lib.GET, feed_b, body=make_rss_xml([
+        {'title': 'Shared', 'url': 'https://www.bbc.com/news/shared', 'hours_ago': 1},
+    ]))
+
+    articles = BBCScraper(make_config(), {'feeds': [feed_a, feed_b]}).fetch_articles(hours=24)
+
+    assert sorted(a.title for a in articles) == ['Only A', 'Shared']
+    assert mock_content.call_count == 2
+
+
+@responses_lib.activate
+def test_guardian_sends_region_tag():
+    responses_lib.add(responses_lib.GET, GuardianScraper.API_URL, body=make_guardian_response([]),
+                      content_type='application/json')
+
+    GuardianScraper(make_config(), {'tag': 'world/india'}).fetch_articles(hours=24)
+
+    assert 'tag=world%2Findia' in responses_lib.calls[0].request.url
+
+
+@responses_lib.activate
+def test_worldnews_sends_region_params():
+    responses_lib.add(responses_lib.GET, WorldNewsScraper.API_URL, body=make_worldnews_response([]),
+                      content_type='application/json')
+
+    WorldNewsScraper(make_config(), {'entities': 'LOC:India'}).fetch_articles(hours=24)
+
+    url = responses_lib.calls[0].request.url
+    assert 'entities=LOC%3AIndia' in url
+    assert 'source-countries' not in url
+
+
+# ── prepare_articles ──────────────────────────────────────────────────────────
+
+def test_prepare_articles_unescapes_html_entities():
+    from models.article import Article
+    from scrapers.utils import prepare_articles
+    a = Article(title='Couple&#8217;s journey', content='Fish &amp; chips', url='https://x.com/1',
+                published_at=datetime.now(timezone.utc), source='World News')
+
+    out = prepare_articles([a])
+
+    assert out[0].title == 'Couple’s journey'
+    assert out[0].content == 'Fish & chips'
+
+
+# ── regions.json ──────────────────────────────────────────────────────────────
+
+def test_regions_file_has_label_and_all_sources():
+    from config import load_regions
+    regions = load_regions()
+    assert 'GLOBAL' in regions and 'INDIA' in regions
+    for key, r in regions.items():
+        assert r['label'], key
+        assert r['bbc']['feeds'], key
+        assert isinstance(r['guardian'], dict) and isinstance(r['worldnews'], dict), key

@@ -73,20 +73,25 @@ def _render_errors(errors: List[str]) -> str:
     )
 
 
-def generate_email_html(summary: DigestSummary, errors: Optional[List[str]] = None) -> str:
+def generate_email_html(summary: DigestSummary, errors: Optional[List[str]] = None,
+                        region: str = 'Global', notice: Optional[str] = None) -> str:
+    """`notice` replaces the stories with a plain message (used for no-news / outage days)."""
     dt = summary.generated_at
     date_str = f"{dt.strftime('%B')} {dt.day}, {dt.year}"
 
     stories = summary.stories or []
     stories_html = '\n\n'.join(_render_story(s, i) for i, s in enumerate(stories))
     errors_html = _render_errors(errors or [])
+    if notice:
+        stories_html = f'<p class="notice">{html.escape(notice)}</p>'
+    label = html.escape(f'Daily Brief | {region}')
 
     html_out = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daily Brief | {html.escape(date_str)}</title>
+  <title>{label} | {html.escape(date_str)}</title>
   <style>
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{
@@ -119,6 +124,7 @@ def generate_email_html(summary: DigestSummary, errors: Optional[List[str]] = No
     }}
 
     .content {{ padding: 12px 24px 40px; }}
+    .notice {{ padding-top: 36px; font-size: 15.5px; line-height: 1.7; color: #3A3A3A; }}
 
     .story {{
       padding-top: 36px;
@@ -223,7 +229,7 @@ def generate_email_html(summary: DigestSummary, errors: Optional[List[str]] = No
 </head>
 <body>
   <div class="masthead">
-    <p class="masthead-label">Daily Brief</p>
+    <p class="masthead-label">{label}</p>
     <p class="masthead-date">{html.escape(date_str)}</p>
   </div>
 

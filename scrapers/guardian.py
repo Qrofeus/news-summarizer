@@ -47,6 +47,7 @@ class GuardianScraper(NewsSource):
             'page-size': 50,
             'from-date': cutoff.strftime('%Y-%m-%d'),
             'order-by': 'newest',
+            **self.params,
         }
         response = self.session.get(self.API_URL, params=params, timeout=10)
         response.raise_for_status()

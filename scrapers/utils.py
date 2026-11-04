@@ -1,3 +1,4 @@
+import html
 import logging
 import re
 import time
@@ -15,7 +16,10 @@ _MAX_ARTICLES = 50
 
 
 def prepare_articles(all_articles: List[Article]) -> List[Article]:
-    """Category-filter, dedup, and proportional-sort to the digest cap."""
+    """Unescape, category-filter, dedup, and proportional-sort to the digest cap."""
+    for a in all_articles:
+        # Some APIs return HTML entities in text (e.g. "&#8217;"); the email escapes again on render
+        a.title, a.content = html.unescape(a.title), html.unescape(a.content)
     filtered = [
         a for a in all_articles
         if not a.category or a.category.lower() not in _SKIP_CATEGORIES

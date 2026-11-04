@@ -49,11 +49,11 @@ class WorldNewsScraper(NewsSource):
         params = {
             'api-key': self.config.worldnews_api_key,
             'language': 'en',
-            'source-countries': 'us,gb',
             'earliest-publish-date': cutoff.strftime('%Y-%m-%d %H:%M:%S'),
             'sort': 'publish-time',
             'sort-direction': 'desc',
             'number': 50,
+            **self.params,  # region filter: 'source-countries' or 'entities'
         }
         response = self.session.get(self.API_URL, params=params, timeout=15)
         response.raise_for_status()

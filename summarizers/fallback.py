@@ -15,7 +15,7 @@ def _extract_summary(article: Article) -> str:
 
 
 class FallbackSummarizer(Summarizer):
-    def summarize(self, articles: List[Article]) -> DigestSummary:
+    def summarize(self, articles: List[Article], region: str = 'Global') -> DigestSummary:
         stories = [
             {
                 'title': a.title,

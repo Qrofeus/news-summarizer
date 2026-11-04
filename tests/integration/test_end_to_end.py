@@ -11,7 +11,7 @@ import pytest
 
 from config import Config
 from models.article import Article, DigestSummary
-from main import run_daily_digest, InsufficientDataError
+from main import run_daily_digest
 from summarizers.gemini import MODEL
 
 _FIXTURES = Path(__file__).parent.parent / 'fixtures' / 'sample_articles.json'
@@ -43,7 +43,7 @@ def _make_config(**overrides) -> Config:
         smtp_user='user@example.com',
         smtp_password='pass',
         smtp_from='user@example.com',
-        recipients=['recipient@example.com'],
+        subscribers={'GLOBAL': ['recipient@example.com']},
         admin_email='admin@qrofeus.dev',
         user_agent='TestAgent/1.0',
         request_delay=0.0,
@@ -75,140 +75,153 @@ def _make_summary(articles: list[Article], used_fallback=False) -> DigestSummary
     )
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+_PATCHES = ['main.BBCScraper', 'main.GuardianScraper', 'main.WorldNewsScraper',
+            'main.GeminiSummarizer', 'main.send_digest', 'main.send_error_email', 'main.Config.from_env']
+
+
+@pytest.fixture
+def m():
+    """All external I/O mocked. Each scraper returns 2 articles by default."""
+    patchers = {p.split('.')[-1]: patch(p) for p in _PATCHES}
+    mocks = {k: v.start() for k, v in patchers.items()}
+    articles = _load_articles()
+    mocks['articles'] = articles
+    mocks['from_env'].return_value = _make_config()
+    for name, src, chunk in [('BBCScraper', 'BBC', articles[:2]),
+                             ('GuardianScraper', 'The Guardian', articles[2:4]),
+                             ('WorldNewsScraper', 'World News', articles[4:])]:
+        mocks[name].return_value.fetch_articles.return_value = chunk
+        mocks[name].return_value.get_source_name.return_value = src
+    mocks['GeminiSummarizer'].return_value.summarize.return_value = _make_summary(articles)
+    mocks['send_digest'].return_value = {'success': True, 'sent': 1, 'failed': 0}
+    yield mocks
+    for v in patchers.values():
+        v.stop()
+
+
+def _set_sources(m, value=None, error=None):
+    for name in ['BBCScraper', 'GuardianScraper', 'WorldNewsScraper']:
+        f = m[name].return_value.fetch_articles
+        f.return_value, f.side_effect = (value or []), error
+
+
 # ── Happy path ────────────────────────────────────────────────────────────────
 
-@patch('main.send_digest')
-@patch('main.Config.from_env')
-@patch('main.GeminiSummarizer')
-@patch('main.WorldNewsScraper')
-@patch('main.GuardianScraper')
-@patch('main.BBCScraper')
-def test_full_pipeline_runs(mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config, mock_send):
-    articles = _load_articles()
-    mock_config.return_value = _make_config()
-    mock_bbc.return_value.fetch_articles.return_value = articles[:2]
-    mock_bbc.return_value.get_source_name.return_value = 'BBC'
-    mock_guardian.return_value.fetch_articles.return_value = articles[2:4]
-    mock_guardian.return_value.get_source_name.return_value = 'The Guardian'
-    mock_worldnews.return_value.fetch_articles.return_value = articles[4:]
-    mock_worldnews.return_value.get_source_name.return_value = 'World News'
-    mock_gemini.return_value.summarize.return_value = _make_summary(articles)
+def test_full_pipeline_runs(m):
+    run_daily_digest()
+
+    m['GeminiSummarizer'].return_value.summarize.assert_called_once()
+    args = m['GeminiSummarizer'].return_value.summarize.call_args[0]
+    assert len(args[0]) == 6
+    assert args[1] == 'Global'
+    html, recipients, region, _ = m['send_digest'].call_args[0]
+    assert recipients == ['recipient@example.com']
+    assert region == 'Global'
+    m['send_error_email'].assert_not_called()
+
+
+def test_scrapers_get_region_params(m):
+    m['from_env'].return_value = _make_config(subscribers={'INDIA': ['a@x.com']})
 
     run_daily_digest()
 
-    mock_gemini.return_value.summarize.assert_called_once()
-    args = mock_gemini.return_value.summarize.call_args[0][0]
-    assert len(args) == 6
+    assert m['BBCScraper'].call_args[0][1]['feeds'] == ['https://feeds.bbci.co.uk/news/world/asia/india/rss.xml']
+    assert m['WorldNewsScraper'].call_args[0][1] == {'entities': 'LOC:India'}
+    assert m['send_digest'].call_args[0][2] == 'India'
+
+
+def test_regions_without_subscribers_are_skipped(m):
+    m['from_env'].return_value = _make_config(subscribers={'UK': ['a@x.com'], 'INDIA': [], 'EUROPE': ['b@x.com']})
+
+    run_daily_digest()
+
+    assert m['BBCScraper'].call_count == 2
+    assert m['GeminiSummarizer'].return_value.summarize.call_count == 2
+    assert [c[0][2] for c in m['send_digest'].call_args_list] == ['United Kingdom', 'Europe']
+
+
+def test_unknown_region_emails_admin(m):
+    m['from_env'].return_value = _make_config(subscribers={'GLOBAL': ['a@x.com'], 'MARS': ['b@x.com']})
+
+    run_daily_digest()
+
+    m['send_digest'].assert_called_once()
+    assert 'MARS' in m['send_error_email'].call_args[0][1]
 
 
 # ── Fallback summarizer path ──────────────────────────────────────────────────
 
-@patch('main.send_digest')
-@patch('main.Config.from_env')
 @patch('main.FallbackSummarizer')
-@patch('main.GeminiSummarizer')
-@patch('main.WorldNewsScraper')
-@patch('main.GuardianScraper')
-@patch('main.BBCScraper')
-def test_pipeline_uses_fallback_when_gemini_fails(
-    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_fallback, mock_config, mock_send
-):
-    articles = _load_articles()
-    mock_config.return_value = _make_config(enable_fallback=True)
-    for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
-        mock.return_value.fetch_articles.return_value = articles[:2]
-        mock.return_value.get_source_name.return_value = src
-    mock_gemini.return_value.summarize.side_effect = RuntimeError('quota exceeded')
-    mock_fallback.return_value.summarize.return_value = _make_summary(articles, used_fallback=True)
+def test_pipeline_uses_fallback_when_gemini_fails(mock_fallback, m):
+    m['GeminiSummarizer'].return_value.summarize.side_effect = RuntimeError('quota exceeded')
+    mock_fallback.return_value.summarize.return_value = _make_summary(m['articles'], used_fallback=True)
 
     run_daily_digest()
 
     mock_fallback.return_value.summarize.assert_called_once()
-    assert f'AI summarization unavailable: {MODEL} failed (quota exceeded)' in mock_send.call_args[0][0]
+    assert f'AI summarization unavailable: {MODEL} failed (quota exceeded)' in m['send_digest'].call_args[0][0]
 
 
-# ── Scraper isolation ─────────────────────────────────────────────────────────
+# ── Isolation ─────────────────────────────────────────────────────────────────
 
-@patch('main.send_digest')
-@patch('main.Config.from_env')
-@patch('main.GeminiSummarizer')
-@patch('main.WorldNewsScraper')
-@patch('main.GuardianScraper')
-@patch('main.BBCScraper')
-def test_pipeline_continues_when_one_scraper_fails(
-    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config, mock_send
-):
-    articles = _load_articles()
-    mock_config.return_value = _make_config()
-    mock_bbc.return_value.fetch_articles.side_effect = ConnectionError('timeout')
-    mock_bbc.return_value.get_source_name.return_value = 'BBC'
-    mock_guardian.return_value.fetch_articles.return_value = articles[:3]
-    mock_guardian.return_value.get_source_name.return_value = 'The Guardian'
-    mock_worldnews.return_value.fetch_articles.return_value = articles[3:]
-    mock_worldnews.return_value.get_source_name.return_value = 'World News'
-    mock_gemini.return_value.summarize.return_value = _make_summary(articles[:6])
-
-    # Should not raise despite BBC failing
-    run_daily_digest()
-
-    mock_gemini.return_value.summarize.assert_called_once()
-
-
-# ── Insufficient data guard ───────────────────────────────────────────────────
-
-@patch('main.Config.from_env')
-@patch('main.WorldNewsScraper')
-@patch('main.GuardianScraper')
-@patch('main.BBCScraper')
-def test_pipeline_raises_on_too_few_articles(mock_bbc, mock_guardian, mock_worldnews, mock_config):
-    mock_config.return_value = _make_config()
-    for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
-        mock.return_value.fetch_articles.return_value = []
-        mock.return_value.get_source_name.return_value = src
-
-    with pytest.raises(InsufficientDataError):
-        run_daily_digest()
-
-
-# ── send_digest is called on success ─────────────────────────────────────────
-
-@patch('main.send_digest')
-@patch('main.Config.from_env')
-@patch('main.GeminiSummarizer')
-@patch('main.WorldNewsScraper')
-@patch('main.GuardianScraper')
-@patch('main.BBCScraper')
-def test_send_digest_called_on_success(
-    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config, mock_send
-):
-    articles = _load_articles()
-    mock_config.return_value = _make_config()
-    for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
-        mock.return_value.fetch_articles.return_value = articles[:2]
-        mock.return_value.get_source_name.return_value = src
-    mock_gemini.return_value.summarize.return_value = _make_summary(articles)
+def test_pipeline_continues_when_one_scraper_fails(m):
+    m['BBCScraper'].return_value.fetch_articles.side_effect = ConnectionError('timeout')
 
     run_daily_digest()
 
-    mock_send.assert_called_once()
+    m['GeminiSummarizer'].return_value.summarize.assert_called_once()
+    m['send_error_email'].assert_not_called()
 
 
-# ── LLM errors without fallback propagate ────────────────────────────────────
+def test_one_region_failing_does_not_stop_others(m):
+    m['from_env'].return_value = _make_config(subscribers={'UK': ['a@x.com'], 'EUROPE': ['b@x.com']})
+    m['GeminiSummarizer'].return_value.summarize.side_effect = [RuntimeError('boom'), _make_summary(m['articles'])]
+    m['from_env'].return_value.enable_fallback = False
 
-@patch('main.Config.from_env')
-@patch('main.GeminiSummarizer')
-@patch('main.WorldNewsScraper')
-@patch('main.GuardianScraper')
-@patch('main.BBCScraper')
-def test_pipeline_raises_when_llm_fails_and_fallback_disabled(
-    mock_bbc, mock_guardian, mock_worldnews, mock_gemini, mock_config
-):
-    articles = _load_articles()
-    mock_config.return_value = _make_config(enable_fallback=False)
-    for mock, src in [(mock_bbc, 'BBC'), (mock_guardian, 'The Guardian'), (mock_worldnews, 'World News')]:
-        mock.return_value.fetch_articles.return_value = articles[:2]
-        mock.return_value.get_source_name.return_value = src
-    mock_gemini.return_value.summarize.side_effect = RuntimeError('API down')
+    run_daily_digest()
 
-    with pytest.raises(RuntimeError):
-        run_daily_digest()
+    m['send_digest'].assert_called_once()
+    assert m['send_digest'].call_args[0][2] == 'Europe'
+    assert 'UK: boom' in m['send_error_email'].call_args[0][1]
+
+
+# ── No news / outage ──────────────────────────────────────────────────────────
+
+def test_no_articles_sends_no_news_email(m):
+    _set_sources(m, value=[])
+
+    run_daily_digest()
+
+    m['GeminiSummarizer'].return_value.summarize.assert_not_called()
+    assert 'No news found for Global from our news sources in the last 24 hours.' in m['send_digest'].call_args[0][0]
+    m['send_error_email'].assert_not_called()
+
+
+def test_all_sources_failing_sends_outage_notice_and_emails_admin(m):
+    _set_sources(m, error=ConnectionError('down'))
+
+    run_daily_digest()
+
+    assert "couldn&#x27;t reach our news sources for Global" in m['send_digest'].call_args[0][0]
+    assert 'every source failed' in m['send_error_email'].call_args[0][1]
+
+
+def test_send_failures_reported_as_counts(m):
+    m['send_digest'].return_value = {'success': False, 'sent': 0, 'failed': 1}
+
+    run_daily_digest()
+
+    report = m['send_error_email'].call_args[0][1]
+    assert '1 of 1 emails failed' in report
+    assert 'recipient@example.com' not in report
+
+
+def test_empty_subscribers_emails_admin(m):
+    m['from_env'].return_value = _make_config(subscribers={})
+
+    run_daily_digest()
+
+    m['send_digest'].assert_not_called()
+    assert 'SUBSCRIBERS is empty' in m['send_error_email'].call_args[0][1]

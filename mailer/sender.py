@@ -3,18 +3,20 @@ from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
+from typing import List
+
 from config import Config
 
 
-def send_digest(html: str, config: Config) -> dict:
+def send_digest(html: str, recipients: List[str], region: str, config: Config) -> dict:
     now = datetime.now(timezone.utc)
-    subject = f"Daily News Digest | {now.strftime('%B')} {now.day}, {now.year}"
+    subject = f"Daily News Digest | {region} | {now.strftime('%B')} {now.day}, {now.year}"
 
     sent, failed = 0, []
     with smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=30) as smtp:
         smtp.starttls()
         smtp.login(config.smtp_user, config.smtp_password)
-        for recipient in config.recipients:
+        for recipient in recipients:
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
             msg['From'] = config.smtp_from
